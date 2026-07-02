@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 import subprocess
@@ -11,15 +12,15 @@ import sys
 from pathlib import Path
 
 
-PROJECT_ROOTS = (
-    Path("examples/esp-idf"),
-    Path("firmware"),
-)
-
-BUILD_ALL_PATHS = {
+GLOBAL_PROJECT_PATTERNS = (
+    ".github/workflows/esp-idf-examples.yml",
     ".github/workflows/esp-idf-projects.yml",
+    ".github/scripts/discover_esp_idf_examples.py",
     ".github/scripts/discover_esp_idf_projects.py",
-}
+    "config/*.defaults",
+    "config/**/*.defaults",
+)
+DEFAULT_IDF_VERSIONS = ("v5.5.4", "v6.0.1")
 
 
 def run_git(args: list[str]) -> list[str]:
@@ -36,15 +37,30 @@ def is_project(path: Path) -> bool:
     return (path / "CMakeLists.txt").is_file() and (path / "main").is_dir()
 
 
+def discover_roots() -> list[Path]:
+    roots: list[Path] = []
+    examples = Path("examples")
+    if examples.is_dir():
+        for path in examples.iterdir():
+            if path.is_dir() and path.name.lower().replace("_", "-").startswith("esp-idf"):
+                roots.append(path)
+
+    for firmware_root in (Path("firmware"), Path("Firmware"), Path("FirmWare")):
+        if firmware_root.is_dir():
+            roots.append(firmware_root)
+
+    return sorted(dict.fromkeys(roots), key=lambda item: item.as_posix().lower())
+
+
 def list_projects() -> list[str]:
     projects: list[str] = []
-    for root in PROJECT_ROOTS:
-        if not root.exists():
-            continue
+    for root in discover_roots():
+        if is_project(root):
+            projects.append(root.as_posix())
         for path in root.iterdir():
             if path.is_dir() and is_project(path):
                 projects.append(path.as_posix())
-    return sorted(projects)
+    return sorted(dict.fromkeys(projects))
 
 
 def normalize_project(value: str, known_projects: set[str]) -> str:
@@ -63,34 +79,31 @@ def normalize_project(value: str, known_projects: set[str]) -> str:
     return normalized
 
 
-def project_for_path(changed_path: str, known_projects: set[str]) -> str | None:
-    changed_path = changed_path.strip().strip("/")
-    for project in known_projects:
-        if changed_path == project or changed_path.startswith(project + "/"):
-            return project
-    return None
-
-
 def discover_from_paths(paths: list[str], known_projects: set[str]) -> list[str]:
     selected: set[str] = set()
+    roots = discover_roots()
 
     for changed_path in paths:
         changed_path = changed_path.strip().strip("/")
-        if changed_path in BUILD_ALL_PATHS:
-            return sorted(known_projects)
+        if any(fnmatch.fnmatch(changed_path, pattern) for pattern in GLOBAL_PROJECT_PATTERNS):
+            selected.update(known_projects)
+            continue
 
-        project = project_for_path(changed_path, known_projects)
-        if project:
-            selected.add(project)
+        for project in known_projects:
+            if changed_path == project or changed_path.startswith(project + "/"):
+                selected.add(project)
+                break
+        else:
+            for root in roots:
+                root_path = root.as_posix()
+                if changed_path == root_path or changed_path.startswith(root_path + "/"):
+                    selected.update(known_projects)
+                    break
 
     return sorted(selected)
 
 
-def discover_changed_projects(
-    base_ref: str | None,
-    head_ref: str,
-    known_projects: set[str],
-) -> list[str]:
+def discover_changed_projects(base_ref: str | None, head_ref: str, known_projects: set[str]) -> list[str]:
     if base_ref:
         diff_args = ["diff", "--name-only", f"{base_ref}...{head_ref}"]
     else:
@@ -106,11 +119,30 @@ def github_output(name: str, value: str) -> None:
             output.write(f"{name}={value}\n")
 
 
+def versions_for_project(project: str) -> tuple[str, ...]:
+    return DEFAULT_IDF_VERSIONS
+
+
+def build_matrix(selected: list[str]) -> dict[str, list[dict[str, str]]]:
+    return {
+        "include": [
+            {"project": project, "idf_version": idf_version}
+            for project in selected
+            for idf_version in versions_for_project(project)
+        ]
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-ref")
     parser.add_argument("--head-ref", default="HEAD")
     parser.add_argument("--project", default="")
+    parser.add_argument(
+        "--fallback-all",
+        action="store_true",
+        help="Build all projects when no changed project is detected.",
+    )
     args = parser.parse_args()
 
     known_projects = set(list_projects())
@@ -128,8 +160,10 @@ def main() -> int:
         selected = [requested_project]
     else:
         selected = discover_changed_projects(args.base_ref, args.head_ref, known_projects)
+        if args.fallback_all and not selected:
+            selected = sorted(known_projects)
 
-    matrix = {"project": selected}
+    matrix = build_matrix(selected)
     matrix_json = json.dumps(matrix, separators=(",", ":"))
     has_projects = "true" if selected else "false"
 

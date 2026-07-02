@@ -8,6 +8,7 @@
 #include "esp_brookesia.hpp"
 
 #include "bsp/touch.h"
+#include "driver/gpio.h"
 #include "esp_lib_utils.h"
 #include "esp_check.h"
 #include "esp_err.h"
@@ -279,8 +280,8 @@ namespace esp_brookesia::apps
                     .i2c_handle = bsp_i2c_get_handle(),
                     .freq = CONFIG_BSP_I2C_CLK_SPEED_HZ,
                 },
-                .reset_pin = -1,
-                .pwdn_pin = -1,
+                .reset_pin = GPIO_NUM_NC,
+                .pwdn_pin = GPIO_NUM_NC,
             },
         };
 

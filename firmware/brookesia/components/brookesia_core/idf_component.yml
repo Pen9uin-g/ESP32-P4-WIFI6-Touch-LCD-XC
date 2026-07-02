@@ -4,6 +4,9 @@ url: https://github.com/espressif/esp-brookesia/tree/master/core/brookesia_core
 issues: https://github.com/espressif/esp-brookesia/issues
 repository: https://github.com/espressif/esp-brookesia.git
 dependencies:
+  espressif/cjson:
+    version: "^1.7.19"
+    public: true
   idf: ">=5.3"
 
   # Utilities
@@ -16,12 +19,12 @@ dependencies:
     public: true
 
   espressif/esp-boost:
-    version: "0.3.*"
+    version: "*"
     public: true
 
   # GUI - LVGL
   lvgl/lvgl:
-    version: "9.4.*"
+    version: "9.5.0"
     public: true
 
   # GUI - Animation Player
