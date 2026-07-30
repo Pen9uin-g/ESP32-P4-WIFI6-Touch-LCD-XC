@@ -3,6 +3,7 @@
   <p><strong>搭载 Wi-Fi 6 的 ESP32-P4 3.4 / 4 英寸圆形 IPS 触控屏开发板</strong></p>
   <p>
     <a href="https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC/actions/workflows/esp-idf-projects.yml"><img alt="ESP-IDF CI" src="https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC/actions/workflows/esp-idf-projects.yml/badge.svg"></a>
+    <a href="https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC/actions/workflows/arduino-projects.yml"><img alt="Arduino CI" src="https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC/actions/workflows/arduino-projects.yml/badge.svg"></a>
     <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC"></a>
   </p>
   <p>
@@ -57,7 +58,7 @@ MIPI-DSI 触控屏，适合用于图形化人机交互、多媒体应用、边�
 
 ## 🚀 快速开始
 
-当前 CI 工作流使用 ESP-IDF `v5.5.4`。
+CI 使用 ESP-IDF `v5.5.5` 和 `v6.0.2` 测试全部一方 ESP-IDF 工程。
 
 ```bash
 cd examples/esp-idf/02_HelloWorld
@@ -113,13 +114,14 @@ idf.py -p PORT flash monitor
 
 | 范围 | 当前覆盖 |
 | --- | --- |
-| 仓库自检 | 文档与工程结构 |
-| ESP-IDF | 使用 ESP-IDF `v5.5.4`、目标 `esp32p4` 构建有改动的一方工程 |
-| Arduino | 仓库包含 Arduino 示例，但当前工作流尚未构建这些示例 |
+| 仓库自检 | 文档、工程结构与一方 Arduino 示例目录 |
+| ESP-IDF | 13 个一方工程，ESP-IDF `v5.5.5` 和 `v6.0.2`，目标 `esp32p4` |
+| Arduino | 5 个一方示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置 |
 
-对 `README.md` 和 `docs/` 目录中文档的改动会触发仓库自检。ESP-IDF 一方工程
-发生改动或手动选择全部工程时才会运行固件构建任务。工作流的工程发现和手动
-触发方式请参阅[持续集成说明](docs/CI.md)。
+纯文档改动只触发仓库自检，不运行产品构建。ESP-IDF 或 Arduino 一方工程及
+共享构建输入发生改动，或手动选择工程时，才会运行对应构建任务；配套库自带
+的上游示例不会进入发现矩阵。工作流发现和手动触发方式请参阅
+[持续集成说明](docs/CI.md)。
 
 ## 🗂️ 仓库结构
 

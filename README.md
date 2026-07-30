@@ -3,6 +3,7 @@
   <p><strong>ESP32-P4 3.4 / 4-inch round IPS touch display development boards with Wi-Fi 6</strong></p>
   <p>
     <a href="https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC/actions/workflows/esp-idf-projects.yml"><img alt="ESP-IDF CI" src="https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC/actions/workflows/esp-idf-projects.yml/badge.svg"></a>
+    <a href="https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC/actions/workflows/arduino-projects.yml"><img alt="Arduino CI" src="https://github.com/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC/actions/workflows/arduino-projects.yml/badge.svg"></a>
     <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/waveshareteam/ESP32-P4-WIFI6-Touch-LCD-XC"></a>
   </p>
   <p>
@@ -64,7 +65,8 @@ instructions.
 
 ## 🚀 Quick Start
 
-ESP-IDF `v5.5.4` is the version used by the current CI workflow.
+CI tests every first-party ESP-IDF project with ESP-IDF `v5.5.5` and
+`v6.0.2`.
 
 ```bash
 cd examples/esp-idf/02_HelloWorld
@@ -122,13 +124,14 @@ platform guidance.
 
 | Surface | Current coverage |
 | --- | --- |
-| Repository self-check | Documentation and project structure |
-| ESP-IDF | Changed first-party projects with ESP-IDF `v5.5.4`, target `esp32p4` |
-| Arduino | Sketches are included in the repository but are not built by the current workflow |
+| Repository self-check | Documentation, project structure, and first-party sketch layout |
+| ESP-IDF | 13 first-party projects with ESP-IDF `v5.5.5` and `v6.0.2`, target `esp32p4` |
+| Arduino | 5 first-party sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays |
 
-Changes to `README.md` and files under `docs/` trigger the repository
-self-check. ESP-IDF build jobs run when a first-party project changes or when
-all projects are selected manually. See
+Documentation-only changes trigger the repository self-check without starting
+product builds. ESP-IDF and Arduino build jobs run when their first-party
+projects or shared build inputs change, or when selected manually. Bundled
+library examples are excluded from discovery. See
 [Continuous Integration](docs/CI.md) for workflow discovery and dispatch
 behavior.
 

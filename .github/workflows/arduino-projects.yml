@@ -1,0 +1,122 @@
+name: Arduino projects
+
+on:
+  pull_request:
+    paths:
+      - "examples/arduino/examples/**"
+      - "examples/arduino/libraries/**"
+      - ".github/workflows/arduino-projects.yml"
+      - ".github/scripts/discover_arduino_sketches.py"
+  push:
+    branches:
+      - main
+    paths:
+      - "examples/arduino/examples/**"
+      - "examples/arduino/libraries/**"
+      - ".github/workflows/arduino-projects.yml"
+      - ".github/scripts/discover_arduino_sketches.py"
+  workflow_dispatch:
+    inputs:
+      sketch:
+        description: "Arduino sketch directory name, path, or all"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+env:
+  ARDUINO_CORE_VERSION: "3.3.11"
+  ESP32_INDEX_URL: "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
+  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600"
+
+jobs:
+  discover:
+    name: Discover Arduino sketches
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.sketches.outputs.matrix }}
+      has_sketches: ${{ steps.sketches.outputs.has_sketches }}
+      sketches: ${{ steps.sketches.outputs.sketches }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Discover changed Arduino sketches
+        id: sketches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            python .github/scripts/discover_arduino_sketches.py \
+              --sketch "${{ inputs.sketch }}"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            python .github/scripts/discover_arduino_sketches.py \
+              --base-ref "${{ github.event.pull_request.base.sha }}" \
+              --head-ref "${{ github.sha }}"
+          else
+            before="${{ github.event.before }}"
+            if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
+              before=""
+            fi
+            python .github/scripts/discover_arduino_sketches.py \
+              --base-ref "$before" \
+              --head-ref "${{ github.sha }}"
+          fi
+
+      - name: Summary
+        shell: bash
+        run: |
+          if [[ "${{ steps.sketches.outputs.has_sketches }}" == "true" ]]; then
+            {
+              echo "### Arduino sketches selected"
+              echo
+              echo '${{ steps.sketches.outputs.sketches }}' | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
+              echo
+              echo "Each sketch is compiled for the 3.4C and 4C displays."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No Arduino sketch changes detected." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  build:
+    name: Build ${{ matrix.sketch_name }} (${{ matrix.screen }})
+    needs: discover
+    if: needs.discover.outputs.has_sketches == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install Arduino-ESP32
+        shell: bash
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls "$ESP32_INDEX_URL"
+          arduino-cli core install "esp32:esp32@$ARDUINO_CORE_VERSION" \
+            --additional-urls "$ESP32_INDEX_URL"
+
+      - name: Compile sketch
+        shell: bash
+        run: |
+          set -euo pipefail
+          library_root="$GITHUB_WORKSPACE/examples/arduino/libraries"
+          build_path="$RUNNER_TEMP/arduino-build/${{ matrix.sketch_name }}/${{ matrix.screen }}"
+
+          arduino-cli compile \
+            --fqbn "$ARDUINO_FQBN" \
+            --warnings all \
+            --libraries "$library_root" \
+            --build-path "$build_path" \
+            --build-property "compiler.c.extra_flags=-I$library_root" \
+            --build-property "compiler.cpp.extra_flags=-I$library_root -DCURRENT_SCREEN=${{ matrix.screen_define }}" \
+            "${{ matrix.sketch }}"

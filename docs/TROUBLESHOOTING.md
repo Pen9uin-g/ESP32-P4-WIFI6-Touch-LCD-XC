@@ -6,7 +6,7 @@ Use this checklist when an example does not build, flash, or run as expected.
 
 - Confirm ESP-IDF is active and supports ESP32-P4.
 - Run `idf.py --version` and compare it with the version documented by the
-  example. ESP-IDF v5.5.x is recommended for CI parity.
+  example. CI currently tests ESP-IDF `v5.5.5` and `v6.0.2`.
 - Remove generated build outputs if configuration changed significantly:
   `build/`, `managed_components/`, `dependencies.lock`, and local `sdkconfig`.
 - Run `idf.py set-target esp32p4` before the first build in a project.

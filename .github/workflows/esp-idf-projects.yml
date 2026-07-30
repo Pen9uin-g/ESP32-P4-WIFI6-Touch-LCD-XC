@@ -3,24 +3,32 @@ name: ESP-IDF projects
 on:
   pull_request:
     paths:
-      - "examples/**"
+      - "README*.md"
+      - "docs/**"
+      - "assets/**"
+      - "examples/README.md"
+      - "examples/esp-idf/**"
       - "firmware/**"
       - "Firmware/**"
       - "FirmWare/**"
       - "config/**"
       - ".github/workflows/esp-idf-projects.yml"
-      - ".github/scripts/discover_esp_idf_projects.py"
+      - ".github/scripts/**"
   push:
     branches:
       - main
     paths:
-      - "examples/**"
+      - "README*.md"
+      - "docs/**"
+      - "assets/**"
+      - "examples/README.md"
+      - "examples/esp-idf/**"
       - "firmware/**"
       - "Firmware/**"
       - "FirmWare/**"
       - "config/**"
       - ".github/workflows/esp-idf-projects.yml"
-      - ".github/scripts/discover_esp_idf_projects.py"
+      - ".github/scripts/**"
   workflow_dispatch:
     inputs:
       project:
@@ -32,8 +40,18 @@ permissions:
   contents: read
 
 jobs:
+  self-check:
+    name: Repository self-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run repository self-check
+        run: python .github/scripts/repo_self_check.py
+
   discover:
-    name: Discover projects
+    name: Discover ESP-IDF projects
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.projects.outputs.matrix }}
@@ -57,8 +75,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             python .github/scripts/discover_esp_idf_projects.py \
               --base-ref "${{ github.event.pull_request.base.sha }}" \
-              --head-ref "${{ github.sha }}" \
-              --fallback-all
+              --head-ref "${{ github.sha }}"
           else
             before="${{ github.event.before }}"
             if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
@@ -66,8 +83,7 @@ jobs:
             fi
             python .github/scripts/discover_esp_idf_projects.py \
               --base-ref "$before" \
-              --head-ref "${{ github.sha }}" \
-              --fallback-all
+              --head-ref "${{ github.sha }}"
           fi
 
       - name: Summary
@@ -85,7 +101,9 @@ jobs:
 
   build:
     name: Build ${{ matrix.project }} (${{ matrix.idf_version }})
-    needs: discover
+    needs:
+      - self-check
+      - discover
     if: needs.discover.outputs.has_projects == 'true'
     runs-on: ubuntu-latest
     strategy:

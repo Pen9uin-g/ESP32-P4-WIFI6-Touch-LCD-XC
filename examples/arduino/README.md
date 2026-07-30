@@ -10,6 +10,26 @@
 
 The current recommendation is to use [![Release Version](https://img.shields.io/github/release/espressif/arduino-esp32.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
 
+### CI-Tested Configuration
+
+GitHub Actions compiles the five first-party sketches with Arduino-ESP32
+`3.3.11`. The CI board configuration is:
+
+```text
+esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600
+```
+
+This selects pre-v3 ESP32-P4 silicon at the board-supported frequency, enables
+the onboard 32 MB PSRAM and 32 MB flash, and provides a 13 MB application
+partition for the larger graphics examples.
+
+Every sketch is compiled for both product displays:
+
+| Product | CI definition |
+| --- | --- |
+| ESP32-P4-WIFI6-Touch-LCD-3.4C | `CURRENT_SCREEN=SCREEN_3INCH_4_DSI` |
+| ESP32-P4-WIFI6-Touch-LCD-4C | `CURRENT_SCREEN=SCREEN_4INCH_DSI` |
+
 ### Documentation
 
 You can use the [Arduino-ESP32 Online Documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/) to get all information about this project.

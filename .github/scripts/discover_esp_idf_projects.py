@@ -13,14 +13,11 @@ from pathlib import Path
 
 
 GLOBAL_PROJECT_PATTERNS = (
-    ".github/workflows/esp-idf-examples.yml",
     ".github/workflows/esp-idf-projects.yml",
-    ".github/scripts/discover_esp_idf_examples.py",
     ".github/scripts/discover_esp_idf_projects.py",
-    "config/*.defaults",
-    "config/**/*.defaults",
+    "config/**",
 )
-DEFAULT_IDF_VERSIONS = ("v5.5.4", "v6.0.1")
+DEFAULT_IDF_VERSIONS = ("v5.5.5", "v6.0.2")
 
 
 def run_git(args: list[str]) -> list[str]:
@@ -138,11 +135,6 @@ def main() -> int:
     parser.add_argument("--base-ref")
     parser.add_argument("--head-ref", default="HEAD")
     parser.add_argument("--project", default="")
-    parser.add_argument(
-        "--fallback-all",
-        action="store_true",
-        help="Build all projects when no changed project is detected.",
-    )
     args = parser.parse_args()
 
     known_projects = set(list_projects())
@@ -160,8 +152,6 @@ def main() -> int:
         selected = [requested_project]
     else:
         selected = discover_changed_projects(args.base_ref, args.head_ref, known_projects)
-        if args.fallback_all and not selected:
-            selected = sorted(known_projects)
 
     matrix = build_matrix(selected)
     matrix_json = json.dumps(matrix, separators=(",", ":"))

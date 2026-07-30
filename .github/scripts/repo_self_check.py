@@ -11,16 +11,22 @@ PROJECT_ROOTS = (
     Path("examples/esp-idf"),
     Path("firmware"),
 )
+ARDUINO_SKETCH_ROOT = Path("examples/arduino/examples")
 
 REQUIRED_FILES = (
     Path("README.md"),
+    Path("README_ZH.md"),
+    Path("assets/ESP32-P4-WIFI6-Touch-LCD-XC.jpg"),
     Path("docs/GETTING_STARTED.md"),
     Path("docs/PROJECT_STRUCTURE.md"),
     Path("docs/CI.md"),
     Path("docs/TROUBLESHOOTING.md"),
     Path("examples/README.md"),
+    Path("examples/arduino/README.md"),
+    Path(".github/scripts/discover_arduino_sketches.py"),
     Path(".github/scripts/discover_esp_idf_projects.py"),
     Path(".github/scripts/repo_self_check.py"),
+    Path(".github/workflows/arduino-projects.yml"),
     Path(".github/workflows/esp-idf-projects.yml"),
 )
 
@@ -103,6 +109,35 @@ def check_example_index(projects: list[Path], errors: list[str]) -> None:
             errors.append(f"examples/README.md does not mention {project_text}")
 
 
+def check_arduino_sketches(errors: list[str]) -> list[Path]:
+    if not ARDUINO_SKETCH_ROOT.is_dir():
+        errors.append(
+            f"Missing Arduino sketch root: {ARDUINO_SKETCH_ROOT.as_posix()}"
+        )
+        return []
+
+    sketch_dirs = sorted(
+        (path for path in ARDUINO_SKETCH_ROOT.iterdir() if path.is_dir()),
+        key=lambda item: item.as_posix(),
+    )
+    if not sketch_dirs:
+        errors.append("No first-party Arduino sketches discovered")
+        return []
+
+    sketches: list[Path] = []
+    for sketch_dir in sketch_dirs:
+        source = sketch_dir / f"{sketch_dir.name}.ino"
+        if not source.is_file():
+            errors.append(
+                "Arduino sketch source must match its directory name: "
+                f"{source.as_posix()}"
+            )
+            continue
+        sketches.append(sketch_dir)
+
+    return sketches
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -110,6 +145,7 @@ def main() -> int:
     check_gitignore(errors)
     projects = check_projects(errors)
     check_example_index(projects, errors)
+    sketches = check_arduino_sketches(errors)
 
     if errors:
         print("Repository self-check failed:", file=sys.stderr)
@@ -117,7 +153,10 @@ def main() -> int:
             print(f"- {error}", file=sys.stderr)
         return 1
 
-    print(f"Repository self-check passed ({len(projects)} ESP-IDF projects).")
+    print(
+        "Repository self-check passed "
+        f"({len(projects)} ESP-IDF projects, {len(sketches)} Arduino sketches)."
+    )
     return 0
 
 
