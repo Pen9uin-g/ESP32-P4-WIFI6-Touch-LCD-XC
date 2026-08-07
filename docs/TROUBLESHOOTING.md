@@ -1,5 +1,7 @@
 # Troubleshooting
 
+[中文](TROUBLESHOOTING_ZH.md)
+
 Use this checklist when an example does not build, flash, or run as expected.
 
 ## Build Issues

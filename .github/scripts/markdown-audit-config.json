@@ -1,0 +1,19 @@
+{
+  "classification_rules": [
+    {
+      "category": "embedded_upstream",
+      "patterns": [
+        "examples/esp-idf/10_mp4_player/components/esp_extractor/**",
+        "examples/esp-idf/11_esp_brookesia_phone/components/brookesia_core/**",
+        "firmware/brookesia/components/brookesia_core/**"
+      ]
+    }
+  ],
+  "pair_exempt_patterns": [
+    "examples/esp-idf/11_esp_brookesia_phone/README_CN.md"
+  ],
+  "language_link_exempt_patterns": [
+    "examples/esp-idf/11_esp_brookesia_phone/README_CN.md"
+  ],
+  "docs_only_allowed_patterns": []
+}

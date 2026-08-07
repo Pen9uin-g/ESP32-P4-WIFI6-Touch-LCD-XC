@@ -1,60 +1,47 @@
 | Supported Targets | ESP32-P4 |
 | ----------------- | -------- |
 
-# Video LCD Display
+# Camera-to-LCD Video Example
 
-This example is based on the [esp_video](https://github.com/espressif/esp-video-components/tree/master/esp_video) component and demonstrates how to display images from the camera on an LCD screen.
+[中文](README_ZH.md)
 
-## How to use the example
+This example uses the Waveshare board-support component and Espressif's
+`esp_video` component to capture frames from a MIPI-CSI camera and display them
+on the round MIPI-DSI LCD of the ESP32-P4-WIFI6-Touch-LCD-XC.
 
-## ESP-IDF Required
+## Hardware
 
-- This example supports ESP-IDF release/v5.4 and later branches. By default, it runs on ESP-IDF release/v5.4.
-- Please follow the [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html) to set up the development environment. **We highly recommend** you [Build Your First Project](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#build-your-first-project) to get familiar with ESP-IDF and make sure the environment is set up correctly.
+- ESP32-P4-WIFI6-Touch-LCD-XC board with the 3.4C or 4C display;
+- a compatible MIPI-CSI camera module. The checked-in default configuration
+  selects the OV5647 RAW8 camera path;
+- a USB-C cable connected to the board's USB-UART interface.
 
-### Prerequisites
+Do not copy the pin table from another ESP32-P4 board. Use the repository
+[hardware audit](../../../docs/HARDWARE.md) and
+[board schematic](../../../hardware/schematics/ESP32-P4-WIFI6-Touch-LCD-XC-Schematic.pdf)
+when changing camera, display, reset, or power configuration.
 
-* An ESP32-P4-Function-EV-Board.
-* A 7-inch 1024 x 600 LCD screen powered by the [EK79007](https://dl.espressif.com/dl/schematics/display_driver_chip_EK79007AD_datasheet.pdf) IC, accompanied by a 32-pin FPC connection [adapter board](https://dl.espressif.com/dl/schematics/esp32-p4-function-ev-board-lcd-subboard-schematics.pdf) ([LCD Specifications](https://dl.espressif.com/dl/schematics/display_datasheet.pdf)).
-* A MIPI-CSI camera powered by the SC2336 IC, accompanied by a 32-pin FPC connection [adapter board](https://dl.espressif.com/dl/schematics/esp32-p4-function-ev-board-camera-subboard-schematics.pdf) ([Camera Specifications](https://dl.espressif.com/dl/schematics/camera_datasheet.pdf)).
-* A USB-C cable for power supply and programming.
-* Please refer to the following steps for the connection:
-    * **Step 1**. According to the table below, connect the pins on the back of the screen adapter board to the corresponding pins on the development board.
+## Configure
 
-        | Screen Adapter Board | ESP32-P4-Function-EV-Board |
-        | -------------------- | -------------------------- |
-        | 5V (any one)         | 5V (any one)               |
-        | GND (any one)        | GND (any one)              |
-        | PWM                  | GPIO26                     |
-        | LCD_RST              | GPIO27                     |
+The default `sdkconfig.defaults` selects an OV5647 MIPI camera format. Run
+`idf.py menuconfig` to review the camera sensor and display options before
+building a different camera or display variant.
 
-    * **Step 2**. Connect the FPC of LCD through the `MIPI_DSI` interface.
-    * **Step 3**. Connect the FPC of Camera through the `MIPI_CSI` interface.
-    * **Step 4**. Use a USB-C cable to connect the `USB-UART` port to a PC (Used for power supply and viewing serial output).
-    * **Step 5**. Turn on the power switch of the board.
+## Build and flash
 
-### Configure the Project
-
-Run `idf.py menuconfig` and navigate to the `Example Configuration` menu, where you can configure the relevant pins and example-related options.
-
-In the `Espressif Camera Sensors` Configurations, the camera sensor can be selected.
-
-```
-Component config  --->
-    Espressif Camera Sensors Configurations  --->
-        [*] SC2336  ---->
-            Default format select for MIPI (RAW8 1280x720 30fps, MIPI 2lane 24M input)  --->
-                (X) RAW8 1280x720 30fps, MIPI 2lane 24M input
-```
-
-### Build and Flash
-
-Build the project and flash it to the board, then run monitor tool to view serial output (replace `PORT` with your board's serial port name):
-
-```c
+```bash
+idf.py set-target esp32p4
+idf.py build
 idf.py -p PORT flash monitor
 ```
 
-To exit the serial monitor, type ``Ctrl-]``.
+Replace `PORT` with the board's serial port. Type `Ctrl-]` to exit the monitor.
+The first build may download registry components into the ignored
+`managed_components/` directory.
 
-See the [ESP-IDF Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
+## Dependencies and validation
+
+The project manifest declares `esp_video` and the Waveshare XC BSP. The example
+is included in the repository's ESP-IDF `v5.5.5` and `v6.0.2` example matrix.
+CI proves that the selected source/configuration compiles; it does not replace
+a physical camera/display test.

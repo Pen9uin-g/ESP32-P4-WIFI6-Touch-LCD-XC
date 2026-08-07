@@ -35,18 +35,16 @@ def is_project(path: Path) -> bool:
 
 
 def discover_roots() -> list[Path]:
-    roots: list[Path] = []
-    examples = Path("examples")
-    if examples.is_dir():
-        for path in examples.iterdir():
-            if path.is_dir() and path.name.lower().replace("_", "-").startswith("esp-idf"):
-                roots.append(path)
+    """Return only the first-party example roots used by default CI.
 
-    for firmware_root in (Path("firmware"), Path("Firmware"), Path("FirmWare")):
-        if firmware_root.is_dir():
-            roots.append(firmware_root)
+    Projects under ``firmware/`` are maintained delivery/source surfaces.  They
+    are inventoried by the repository modernization workflow, but are not part
+    of the example matrix unless a future maintainer adds an explicit,
+    separately named firmware workflow.
+    """
 
-    return sorted(dict.fromkeys(roots), key=lambda item: item.as_posix().lower())
+    root = Path("examples/esp-idf")
+    return [root] if root.is_dir() else []
 
 
 def list_projects() -> list[str]:

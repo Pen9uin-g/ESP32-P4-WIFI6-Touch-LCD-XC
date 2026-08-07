@@ -1,5 +1,7 @@
 # Continuous Integration
 
+[中文](CI_ZH.md)
+
 GitHub Actions performs the repository checks and product builds for this
 repository. The workflows intentionally separate documentation validation from
 firmware compilation so a documentation-only change does not consume product
@@ -9,11 +11,14 @@ build jobs.
 
 | Workflow | Purpose |
 | --- | --- |
+| [Documentation and repository policy](../.github/workflows/documentation.yml) | Always-visible Markdown, structure, and governance checks |
 | [ESP-IDF projects](../.github/workflows/esp-idf-projects.yml) | Repository self-check, ESP-IDF project discovery, and ESP32-P4 builds |
 | [Arduino projects](../.github/workflows/arduino-projects.yml) | First-party Arduino sketch discovery and ESP32-P4 builds |
 
-Both workflows run on relevant pull requests, on matching pushes to `main`, and
-through manual dispatch from the GitHub Actions page.
+The documentation workflow runs on every pull request, on pushes to `main`,
+and through manual dispatch. The product build workflows run on relevant pull
+requests, matching pushes to `main`, and manual dispatch. A new commit cancels
+an obsolete in-progress product run for the same pull request.
 
 ## Repository Self-Check
 
@@ -33,7 +38,8 @@ It verifies that:
 - The ESP-IDF example index includes every discovered project.
 
 Changes limited to `README*.md`, `docs/**`, or `assets/**` run this self-check
-but do not select ESP-IDF or Arduino product builds.
+through the documentation workflow but do not select ESP-IDF or Arduino
+product builds.
 
 ## ESP-IDF Build Discovery
 
@@ -44,14 +50,16 @@ python .github/scripts/discover_esp_idf_projects.py
 ```
 
 A buildable ESP-IDF project contains both `CMakeLists.txt` and `main/`. The
-current project roots are:
+default project root is:
 
 - `examples/esp-idf/`
-- `firmware/` (including supported capitalization variants)
 
-For pull requests and pushes, only affected projects are selected. Changes to
-the ESP-IDF workflow, its discovery helper, or shared files under `config/`
-select all 13 projects.
+For pull requests and pushes, only affected first-party examples are selected.
+Changes to the ESP-IDF workflow, its discovery helper, or shared files under
+`config/` select all 12 examples. The maintained `firmware/brookesia` source
+project is inventoried but intentionally excluded from this default matrix;
+firmware changes need a maintainer-directed workflow and are never inferred
+from a directory name.
 
 Each selected project is built with:
 

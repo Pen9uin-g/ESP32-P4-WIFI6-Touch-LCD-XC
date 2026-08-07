@@ -190,7 +190,7 @@ static void play_media_playlist(void)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "HDMI MP4 Playlist Player Start");
+    ESP_LOGI(TAG, "MP4 Playlist Player Start");
 
     /* ---------- Display ---------- */
 

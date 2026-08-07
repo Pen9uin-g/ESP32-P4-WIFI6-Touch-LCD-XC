@@ -8,9 +8,9 @@
   </p>
   <p>
     <a href="README.md">English</a> ·
-    <a href="https://www.waveshare.net/shop/ESP32-P4-WIFI6-Touch-LCD-3.4C.htm">🌐 3.4C 商品页</a> ·
-    <a href="https://www.waveshare.net/shop/ESP32-P4-WIFI6-Touch-LCD-4C.htm">🌐 4C 商品页</a> ·
+    <a href="https://www.waveshare.net/shop/ESP32-P4-WIFI6-Touch-LCD-3.4C.htm">🌐 产品页</a> ·
     <a href="https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-XC/">📚 产品文档</a> ·
+    <a href="docs/FIRMWARE_ZH.md">📦 固件源码</a> ·
     <a href="examples/esp-idf/">🧩 ESP-IDF 示例</a> ·
     <a href="examples/arduino/">🔧 Arduino 示例</a>
   </p>
@@ -38,7 +38,7 @@ MIPI-DSI 触控屏，适合用于图形化人机交互、多媒体应用、边�
 | [ESP32-P4-WIFI6-Touch-LCD-3.4C](https://www.waveshare.net/shop/ESP32-P4-WIFI6-Touch-LCD-3.4C.htm) | 31523 | 3.4 英寸圆形 IPS LCD，800 × 800 |
 | [ESP32-P4-WIFI6-Touch-LCD-4C](https://www.waveshare.net/shop/ESP32-P4-WIFI6-Touch-LCD-4C.htm) | 31522 | 4 英寸圆形 IPS LCD，720 × 720 |
 
-## ⚙️ 硬件概览
+## 🖥️ 硬件概览
 
 | 功能 | 器件 / 接口 |
 | --- | --- |
@@ -46,7 +46,7 @@ MIPI-DSI 触控屏，适合用于图形化人机交互、多媒体应用、边�
 | 存储 | 封装内置 32 MB PSRAM，板载 32 MB NOR Flash |
 | 无线连接 | ESP32-C6-MINI-1 通过 SDIO 提供 2.4 GHz Wi-Fi 6 和 Bluetooth 5 (LE) |
 | 显示 | 2-lane MIPI-DSI 圆形 IPS LCD；3.4 英寸 800 × 800 或 4 英寸 720 × 720 |
-| 触控 | GT9271 电容触控控制器，最高支持 10 点触控 |
+| 触控 | 电容触控接口；示例使用 GT911 兼容驱动 |
 | 摄像头 | 2-lane MIPI-CSI 摄像头接口 |
 | 音频 | ES8311 音频编解码器、ES7210 音频 ADC、板载麦克风和 8 Ω / 2 W 扬声器接口 |
 | 存储卡与 USB | SDIO 3.0 microSD 卡槽和 USB 2.0 OTG High-Speed |
@@ -71,7 +71,7 @@ idf.py -p PORT flash monitor
 板级配置的示例可能需要先运行 `idf.py menuconfig`。
 
 环境配置及更多说明请参阅
-[入门指南](docs/GETTING_STARTED.md)。
+[入门指南](docs/GETTING_STARTED_ZH.md)。
 
 ## 🧪 示例
 
@@ -108,20 +108,21 @@ idf.py -p PORT flash monitor
 配套库位于
 [`examples/arduino/libraries`](examples/arduino/libraries/)，其中上游库自带的示例
 不属于本产品的一方示例。依赖和当前平台说明请参阅
-[Arduino 说明](examples/arduino/README.md)。
+[Arduino 说明](examples/arduino/README_ZH.md)。
 
 ## ✅ 持续集成
 
 | 范围 | 当前覆盖 |
 | --- | --- |
 | 仓库自检 | 文档、工程结构与一方 Arduino 示例目录 |
-| ESP-IDF | 13 个一方工程，ESP-IDF `v5.5.5` 和 `v6.0.2`，目标 `esp32p4` |
+| ESP-IDF | 12 个一方示例工程，ESP-IDF `v5.5.5` 和 `v6.0.2`，目标 `esp32p4` |
 | Arduino | 5 个一方示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置 |
 
-纯文档改动只触发仓库自检，不运行产品构建。ESP-IDF 或 Arduino 一方工程及
-共享构建输入发生改动，或手动选择工程时，才会运行对应构建任务；配套库自带
-的上游示例不会进入发现矩阵。工作流发现和手动触发方式请参阅
-[持续集成说明](docs/CI.md)。
+纯文档改动只运行始终可见的仓库策略工作流，不运行产品构建。ESP-IDF 或
+Arduino 一方示例及共享构建输入发生改动，或手动选择示例时，才会运行对应
+构建任务；`firmware/` 下维护中的源码工程会被盘点，但不会进入默认示例矩阵；
+配套库自带的上游示例不会进入发现矩阵。工作流发现和手动触发方式请参阅
+[持续集成说明](docs/CI_ZH.md)。
 
 ## 🗂️ 仓库结构
 
@@ -139,10 +140,14 @@ idf.py -p PORT flash monitor
 
 - [官方中文产品文档](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-XC/)
 - [官方英文产品文档](https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-XC)
-- [入门指南](docs/GETTING_STARTED.md)
-- [示例索引](examples/README.md)
-- [工程结构](docs/PROJECT_STRUCTURE.md)
-- [持续集成](docs/CI.md)
+- [入门指南](docs/GETTING_STARTED_ZH.md)
+- [示例索引](examples/README_ZH.md)
+- [工程结构](docs/PROJECT_STRUCTURE_ZH.md)
+- [持续集成](docs/CI_ZH.md)
+- [组件归属](docs/COMPONENTS_ZH.md)
+- [硬件审计](docs/HARDWARE_ZH.md)
+- [固件源码边界](docs/FIRMWARE_ZH.md)
+- [故障排查](docs/TROUBLESHOOTING_ZH.md)
 - [故障排查](docs/TROUBLESHOOTING.md)
 - [开发板原理图](hardware/schematics/ESP32-P4-WIFI6-Touch-LCD-XC-Schematic.pdf)
 

@@ -1,51 +1,40 @@
-# ESP32-P4-Function-EV-Board Running ESP-Brookesia Phone Example
+# ESP-Brookesia Phone-Style UI Example
 
-[中文版本](./README_CN.md)
+[中文](README_ZH.md)
 
-This example demonstrates how to run the ESP-Brookesia Phone on the [ESP32-P4-Function-EV-Board](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32p4/esp32-p4-function-ev-board/index.html) with a `1024 x 600` resolution UI stylesheet.
+This product-specific example runs an ESP-Brookesia phone-style interface on
+the ESP32-P4-WIFI6-Touch-LCD-XC. It uses the local XC board-support component
+and the repository's Brookesia integration, with the display resolution selected
+by the board configuration.
 
-## Getting Started
+## Hardware
 
-### Hardware Requirements
+- ESP32-P4-WIFI6-Touch-LCD-XC with either the 3.4C or 4C display;
+- a USB-C cable connected to the board's USB-UART interface;
+- any optional audio, storage, camera, or hosted-Wi-Fi peripherals enabled by
+  the selected configuration.
 
-* An ESP32-P4-Function-EV-Board with a `1024 x 600` resolution LCD screen.
+Use the repository [hardware audit](../../../docs/HARDWARE.md) and
+[board schematic](../../../hardware/schematics/ESP32-P4-WIFI6-Touch-LCD-XC-Schematic.pdf)
+when changing display, touch, audio, storage, or coprocessor settings. This
+example is not the 1024 × 600 ESP32-P4-Function-EV-Board example from the
+upstream project.
 
-### ESP-IDF Required
+## Configure, build, and flash
 
-- This example supports IDF release/v5.3 and later branches. By default, it runs on IDF release/v5.3.
-- Please follow the [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html) to set up the development environment. **We highly recommend** you [Build Your First Project](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#build-your-first-project) to get familiar with ESP-IDF and make sure the environment is set up correctly.
+Run `idf.py menuconfig` to review the ESP-Brookesia and board settings, then:
 
-### Get the esp-brookesia Repository
-
-To start from the examples in esp-brookesia, clone the repository to the local PC by running the following commands in the terminal:
-
-```
-git clone --recursive https://github.com/espressif/esp-brookesia.git
-```
-
-### Configuration
-
-Run `idf.py menuconfig` and modify the esp-brookesia configuration.
-
-## How to Use the Example
-
-### Build and Flash the Example
-
-Build the project and flash it to the board, then run monitor tool to view serial output (replace `PORT` with your board's serial port name):
-
-```c
+```bash
+idf.py set-target esp32p4
+idf.py build
 idf.py -p PORT flash monitor
 ```
 
-To exit the serial monitor, type `Ctrl-]`.
+Replace `PORT` with the board's serial port. Type `Ctrl-]` to exit the monitor.
+The repository includes the product example integration and declares its
+managed dependencies; a separate clone of the upstream example is not required
+for this project build.
 
-See the [ESP-IDF Getting Started Guide](https://docs.espressif.com/projects/esp-idf/en/latest/get-started/index.html) for full steps to configure and use ESP-IDF to build projects.
-
-## Technical Support and Feedback
-
-Please use the following feedback channels:
-
-- For technical queries, go to the [esp32.com](https://esp32.com/viewforum.php?f=22) forum.
-- For a feature request or bug report, create a [GitHub issue](https://github.com/espressif/esp-brookesia/issues).
-
-We will get back to you as soon as possible.
+The example is included in the repository's ESP-IDF `v5.5.5` and `v6.0.2`
+matrix. CI validates compilation; it does not replace a physical display,
+touch, audio, or Wi-Fi compatibility test.

@@ -1,0 +1,41 @@
+name: Documentation and repository policy
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  policy:
+    name: Markdown and repository policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run repository self-check
+        run: python .github/scripts/repo_self_check.py
+
+      - name: Audit changed Markdown on pull requests
+        if: github.event_name == 'pull_request'
+        run: >-
+          python .github/scripts/audit_markdown.py .
+          --base "${{ github.event.pull_request.base.sha }}"
+          --config .github/scripts/markdown-audit-config.json
+
+      - name: Audit the repository Markdown inventory
+        if: github.event_name != 'pull_request'
+        run: >-
+          python .github/scripts/audit_markdown.py . --all
+          --config .github/scripts/markdown-audit-config.json

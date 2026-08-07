@@ -1,7 +1,9 @@
 # Examples Guide
 
-This directory contains ESP-IDF projects, Arduino notes and bundled libraries,
-firmware applications, and hardware validation tests for the
+[中文](README_ZH.md)
+
+This directory contains first-party ESP-IDF projects, Arduino notes and
+bundled libraries for the
 ESP32-P4-WIFI6-Touch-LCD-XC board.
 
 ## ESP-IDF Examples
@@ -21,12 +23,6 @@ ESP32-P4-WIFI6-Touch-LCD-XC board.
 | `examples/esp-idf/11_esp_brookesia_phone` | ESP-Brookesia phone UI |
 | `examples/esp-idf/12_usb_extend_screen` | USB extended screen |
 
-## Firmware
-
-| Path | Area |
-| --- | --- |
-| `firmware/brookesia` | Board Brookesia firmware application |
-
 ## Arduino
 
 Arduino notes are maintained in [arduino/README.md](arduino/README.md). The
@@ -44,3 +40,7 @@ idf.py build
 
 Also update this index, add project-specific setup notes where appropriate, and
 ensure generated ESP-IDF outputs are not committed.
+
+The maintained `firmware/` source project is documented separately in
+[`docs/FIRMWARE.md`](../docs/FIRMWARE.md). It is intentionally not part of the
+default example build matrix.

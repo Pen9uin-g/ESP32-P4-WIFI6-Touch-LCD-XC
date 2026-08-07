@@ -11,3 +11,4 @@
 **/managed_components
 **/dependencies.lock
 **/sdkconfig
+**/.codex/pdf-preview-cache

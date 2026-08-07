@@ -1,6 +1,8 @@
-# ESP32-P4 Arduino Supported
+# ESP32-P4 Arduino Support
 
-## arduino-esp32 core 
+[中文](README_ZH.md)
+
+## Arduino-ESP32 core
 
 ### Latest Stable Release:
 
@@ -8,7 +10,9 @@
 [![Release Date](https://img.shields.io/github/release-date/espressif/arduino-esp32.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
 [![Downloads](https://img.shields.io/github/downloads/espressif/arduino-esp32/latest/total.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
 
-The current recommendation is to use [![Release Version](https://img.shields.io/github/release/espressif/arduino-esp32.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
+Use the latest stable Arduino-ESP32 release for local experiments. The
+repository CI pin is recorded above and is updated deliberately when the
+compatibility matrix changes.
 
 ### CI-Tested Configuration
 

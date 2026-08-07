@@ -9,7 +9,6 @@ from pathlib import Path
 
 PROJECT_ROOTS = (
     Path("examples/esp-idf"),
-    Path("firmware"),
 )
 ARDUINO_SKETCH_ROOT = Path("examples/arduino/examples")
 
@@ -25,9 +24,37 @@ REQUIRED_FILES = (
     Path("examples/arduino/README.md"),
     Path(".github/scripts/discover_arduino_sketches.py"),
     Path(".github/scripts/discover_esp_idf_projects.py"),
+    Path(".github/scripts/audit_markdown.py"),
+    Path(".github/scripts/markdown-audit-config.json"),
     Path(".github/scripts/repo_self_check.py"),
+    Path(".github/ISSUE_TEMPLATE/bug_report.md"),
+    Path(".github/ISSUE_TEMPLATE/bug_report_ZH.md"),
+    Path(".github/pull_request_template.md"),
+    Path(".github/pull_request_template_ZH.md"),
     Path(".github/workflows/arduino-projects.yml"),
+    Path(".github/workflows/documentation.yml"),
     Path(".github/workflows/esp-idf-projects.yml"),
+    Path("CONTRIBUTING.md"),
+    Path("CONTRIBUTING_ZH.md"),
+    Path("SECURITY.md"),
+    Path("SECURITY_ZH.md"),
+    Path("SUPPORT.md"),
+    Path("SUPPORT_ZH.md"),
+    Path("docs/CI_ZH.md"),
+    Path("docs/COMPONENTS.md"),
+    Path("docs/COMPONENTS_ZH.md"),
+    Path("docs/FIRMWARE.md"),
+    Path("docs/FIRMWARE_ZH.md"),
+    Path("docs/GETTING_STARTED_ZH.md"),
+    Path("docs/HARDWARE.md"),
+    Path("docs/HARDWARE_ZH.md"),
+    Path("docs/PROJECT_STRUCTURE_ZH.md"),
+    Path("docs/TROUBLESHOOTING_ZH.md"),
+    Path("examples/README_ZH.md"),
+    Path("examples/arduino/README_ZH.md"),
+    Path("examples/esp-idf/09_video_lcd_display/README_ZH.md"),
+    Path("examples/esp-idf/10_mp4_player/README_ZH.md"),
+    Path("examples/esp-idf/11_esp_brookesia_phone/README_ZH.md"),
 )
 
 REQUIRED_GITIGNORE_PATTERNS = {

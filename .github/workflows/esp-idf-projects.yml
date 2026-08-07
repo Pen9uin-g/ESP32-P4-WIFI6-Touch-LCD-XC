@@ -3,32 +3,20 @@ name: ESP-IDF projects
 on:
   pull_request:
     paths:
-      - "README*.md"
-      - "docs/**"
-      - "assets/**"
-      - "examples/README.md"
       - "examples/esp-idf/**"
-      - "firmware/**"
-      - "Firmware/**"
-      - "FirmWare/**"
       - "config/**"
       - ".github/workflows/esp-idf-projects.yml"
-      - ".github/scripts/**"
+      - ".github/scripts/discover_esp_idf_projects.py"
+      - ".github/scripts/repo_self_check.py"
   push:
     branches:
       - main
     paths:
-      - "README*.md"
-      - "docs/**"
-      - "assets/**"
-      - "examples/README.md"
       - "examples/esp-idf/**"
-      - "firmware/**"
-      - "Firmware/**"
-      - "FirmWare/**"
       - "config/**"
       - ".github/workflows/esp-idf-projects.yml"
-      - ".github/scripts/**"
+      - ".github/scripts/discover_esp_idf_projects.py"
+      - ".github/scripts/repo_self_check.py"
   workflow_dispatch:
     inputs:
       project:
@@ -38,6 +26,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: esp-idf-projects-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   self-check:

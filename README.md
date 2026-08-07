@@ -10,6 +10,7 @@
     <a href="README_ZH.md">中文</a> ·
     <a href="https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-3.4c.htm">🌐 Product Page</a> ·
     <a href="https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-XC">📚 Product Documentation</a> ·
+    <a href="docs/FIRMWARE.md">📦 Firmware Source</a> ·
     <a href="examples/esp-idf/">🧩 ESP-IDF Examples</a> ·
     <a href="examples/arduino/">🔧 Arduino Examples</a>
   </p>
@@ -43,7 +44,7 @@ Both variants are available from the same
 [product page](https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-3.4c.htm);
 select the required model under **Version Options**.
 
-## ⚙️ Hardware Overview
+## 🖥️ Hardware Overview
 
 | Feature | Device / interface |
 | --- | --- |
@@ -51,7 +52,7 @@ select the required model under **Version Options**.
 | Memory | 32 MB in-package PSRAM and 32 MB NOR Flash |
 | Wireless | ESP32-C6-MINI-1 over SDIO, providing 2.4 GHz Wi-Fi 6 and Bluetooth 5 (LE) |
 | Display | 2-lane MIPI-DSI round IPS LCD; 3.4-inch 800 × 800 or 4-inch 720 × 720 |
-| Touch | GT9271 capacitive touch controller with up to 10-point touch |
+| Touch | Capacitive touch interface; the examples use a GT911-compatible driver |
 | Camera | 2-lane MIPI-CSI camera interface |
 | Audio | ES8311 audio codec, ES7210 audio ADC, onboard microphones, and an 8 Ω / 2 W speaker header |
 | Storage and USB | SDIO 3.0 microSD slot and USB 2.0 OTG High-Speed |
@@ -125,15 +126,16 @@ platform guidance.
 | Surface | Current coverage |
 | --- | --- |
 | Repository self-check | Documentation, project structure, and first-party sketch layout |
-| ESP-IDF | 13 first-party projects with ESP-IDF `v5.5.5` and `v6.0.2`, target `esp32p4` |
+| ESP-IDF | 12 first-party example projects with ESP-IDF `v5.5.5` and `v6.0.2`, target `esp32p4` |
 | Arduino | 5 first-party sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays |
 
-Documentation-only changes trigger the repository self-check without starting
-product builds. ESP-IDF and Arduino build jobs run when their first-party
-projects or shared build inputs change, or when selected manually. Bundled
-library examples are excluded from discovery. See
-[Continuous Integration](docs/CI.md) for workflow discovery and dispatch
-behavior.
+Documentation-only changes run the always-visible repository policy workflow
+without starting product builds. ESP-IDF and Arduino build jobs run when their
+first-party examples or shared build inputs change, or when selected manually.
+The maintained `firmware/` source project is inventoried but is intentionally
+outside the default example matrix. Bundled library examples are excluded from
+discovery. See [Continuous Integration](docs/CI.md) for workflow discovery and
+dispatch behavior.
 
 ## 🗂️ Repository Layout
 
@@ -155,6 +157,9 @@ behavior.
 - [Examples Guide](examples/README.md)
 - [Project Structure](docs/PROJECT_STRUCTURE.md)
 - [Continuous Integration](docs/CI.md)
+- [Component Ownership](docs/COMPONENTS.md)
+- [Hardware Audit](docs/HARDWARE.md)
+- [Firmware Source Boundary](docs/FIRMWARE.md)
 - [Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Board Schematic](hardware/schematics/ESP32-P4-WIFI6-Touch-LCD-XC-Schematic.pdf)
 
