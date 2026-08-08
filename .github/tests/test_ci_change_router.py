@@ -78,11 +78,19 @@ class RouterTests(unittest.TestCase):
         cmake = (project / "CMakeLists.txt").read_text(encoding="utf-8")
         manifest = (project / "main" / "idf_component.yml").read_text(encoding="utf-8")
         overlay = (project / "sdkconfig.ci.vendor-only").read_text(encoding="utf-8")
+        descriptors = (
+            project / "main" / "tusb" / "usb_descriptors.c"
+        ).read_text(encoding="utf-8")
         self.assertIn('option(USB_DEVICE_UAC_COMPONENT', cmake)
         self.assertIn('set(ENV{USB_DEVICE_UAC_COMPONENT} "enabled")', cmake)
         self.assertIn('set(ENV{USB_DEVICE_UAC_COMPONENT} "disabled")', cmake)
         self.assertIn('$USB_DEVICE_UAC_COMPONENT == enabled', manifest)
         self.assertIn("# CONFIG_UAC_AUDIO_ENABLE is not set", overlay)
+        self.assertIn(
+            '#if CONFIG_UAC_AUDIO_ENABLE\n#include "uac_config.h"\n#include "uac_descriptors.h"',
+            descriptors,
+        )
+        self.assertIn("#if CFG_TUD_AUDIO\n#define CONFIG_TOTAL_LEN", descriptors)
 
     def test_parse_name_status_preserves_both_rename_sides(self) -> None:
         changes = router.parse_name_status_z(
