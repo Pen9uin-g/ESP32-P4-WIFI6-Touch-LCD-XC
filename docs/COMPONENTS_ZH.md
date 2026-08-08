@@ -7,12 +7,22 @@
 
 ## 注册表板级支持
 
-ESP-IDF 示例在 manifest 中声明 Waveshare 的
-`waveshare/esp32_p4_wifi6_touch_lcd_xc` 以及相关 Espressif/LVGL 组件。仓库中
-多个示例下的 `waveshare__esp32_p4_wifi6_touch_lcd_xc` 是带板级头文件和
-manifest 的注册表形态 BSP 源码，为支持当前矩阵而保持一致。未来如果改为只下载
-managed component，必须先核对组件版本、支持的 IDF 分支、生成配置和两个显示
-变体的板级行为。
+示例 07 至 12 都带有 registry 形态的本地
+`waveshare/esp32_p4_wifi6_touch_lcd_xc` BSP 2.0.0。对应一方 manifest 现在精确要求
+`2.0.0`，不再使用浮动通配符，未来 registry 版本不能静默替换仓库内源码。
+
+这六份源码不是可互换的缓存输出。示例 08 和 09 带有本板专用的 `GPIO23` GT911
+复位定义，其余四份将触控复位 GPIO 保持为未连接；另有两份只存在语义等价的 CMake
+依赖顺序差异。在这些差异上游化或被证明不再需要前，本地副本应继续保留。
+
+[Component Registry](https://components.espressif.com/components/waveshare/esp32_p4_wifi6_touch_lcd_xc)
+当前发布的是 `3.0.1`，相对本地 `2.0.0` 属于 semver 主版本变化并增加了一个依赖。
+未来迁移到 managed component 前，必须核对导出 API、Kconfig、GPIO23 行为、两条
+ESP-IDF 版本线、P4 revision 要求以及两个显示型号。
+
+USB 扩展屏示例还把 `espressif/tinyusb` 精确固定为 `0.19.0~3`。这是当前 CI 基线
+实际覆盖的 registry 版本，精确版本可避免未来 TinyUSB 上传静默改变 USB 描述符或
+P4 PHY 行为；现有 `espressif/usb_device_uac` 依赖继续保持 `1.2.0`。
 
 ## 产品或示例本地组件
 
@@ -25,7 +35,7 @@ managed component，必须先核对组件版本、支持的 IDF 分支、生成�
 | `examples/esp-idf/12_usb_extend_screen/components/bsp_extra` | USB/显示示例专用的板级 glue |
 
 `firmware/brookesia/components/` 是单独维护的固件源码面。本次仓库工作只盘点它，
-不会修改或加入默认示例 CI。
+不会修改、重新固定依赖或加入默认示例 CI。
 
 如果可复用的修复应当进入 Waveshare 共享组件仓库，应先获得上游修改和发布新依赖
 版本的授权。未经原理图和两个显示变体核对，不要静默用共享组件替换本地板级 glue。

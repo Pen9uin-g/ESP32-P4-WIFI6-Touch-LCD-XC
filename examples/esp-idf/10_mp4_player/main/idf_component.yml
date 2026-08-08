@@ -2,7 +2,7 @@ dependencies:
   idf: ">=5.4"
 
   waveshare/esp32_p4_wifi6_touch_lcd_xc:
-    version: "*"
+    version: "2.0.0"
 
   espressif/esp_audio_codec:
     # v2.6+ requires ESP32-P4 rev >= 3.0; this board's default configuration

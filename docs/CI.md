@@ -2,66 +2,74 @@
 
 [中文](CI_ZH.md)
 
-GitHub Actions performs the repository checks and product builds for this
-repository. The workflows intentionally separate documentation validation from
-firmware compilation so a documentation-only change does not consume product
-build jobs.
+GitHub Actions is the build authority for this repository. Maintainers may run
+the Python policy checks locally, but product compilation evidence comes from
+Actions after the change is committed and pushed.
 
 ## Workflows
 
 | Workflow | Purpose |
 | --- | --- |
-| [Documentation and repository policy](../.github/workflows/documentation.yml) | Always-visible Markdown, structure, and governance checks |
-| [ESP-IDF projects](../.github/workflows/esp-idf-projects.yml) | Repository self-check, ESP-IDF project discovery, and ESP32-P4 builds |
-| [Arduino projects](../.github/workflows/arduino-projects.yml) | First-party Arduino sketch discovery and ESP32-P4 builds |
+| [Documentation and repository policy](../.github/workflows/documentation.yml) | Always-visible unit, Markdown, structure, and routing-policy checks |
+| [ESP-IDF projects](../.github/workflows/esp-idf-projects.yml) | Conditional ESP32-P4 builds for first-party ESP-IDF examples |
+| [Arduino projects](../.github/workflows/arduino-projects.yml) | Conditional ESP32-P4 builds for first-party Arduino sketches |
 
-The documentation workflow runs on every pull request, on pushes to `main`,
-and through manual dispatch. The product build workflows run on relevant pull
-requests, matching pushes to `main`, and manual dispatch. A new commit cancels
-an obsolete in-progress product run for the same pull request.
+All three workflows start on every pull request and on pushes to `main`. The
+product workflows always expose their routing result, while their expensive
+build jobs run only when the route selects a product project. A newer pull
+request commit cancels an obsolete in-progress run. Pull-request jobs check out
+and build the exact head SHA rather than GitHub's synthetic merge commit.
 
-## Repository Self-Check
+## Static policy gate
 
-The ESP-IDF workflow runs:
+The policy workflow runs:
 
 ```bash
+python -m unittest discover -s .github/tests -p "test_*.py"
 python .github/scripts/repo_self_check.py
+python .github/scripts/audit_markdown.py . --all --config .github/scripts/markdown-audit-config.json
 ```
 
-It verifies that:
+On pull requests, the Markdown command uses the base SHA instead of `--all`.
+The self-check verifies required documentation and workflows, generated-output
+ignore rules, all 12 direct ESP-IDF projects, all 5 direct Arduino sketches,
+and the example index.
 
-- Repository-level documentation, product artwork, CI workflows, and helper
-  scripts exist.
-- Generated ESP-IDF outputs are ignored.
-- Every discovered ESP-IDF project has the minimum expected structure.
-- Every first-party Arduino sketch has a same-named `.ino` file.
-- The ESP-IDF example index includes every discovered project.
+## Complete change routing
 
-Changes limited to `README*.md`, `docs/**`, or `assets/**` run this self-check
-through the documentation workflow but do not select ESP-IDF or Arduino
-product builds.
-
-## ESP-IDF Build Discovery
-
-The discovery helper runs:
+Both product workflows and the policy workflow use one classifier:
 
 ```bash
-python .github/scripts/discover_esp_idf_projects.py
+python .github/scripts/ci_change_router.py --base-ref <base-sha> --head-ref <head-sha>
 ```
 
-A buildable ESP-IDF project contains both `CMakeLists.txt` and `main/`. The
-default project root is:
+The classifier reads `git diff --name-status -z --find-renames`. Deletions and
+both sides of a rename therefore retain their original build impact. An invalid
+ref or an unexpectedly empty diff is an operational failure, never a silent
+green no-build result. The policy workflow adds `--strict-unknown`, so a new
+unclassified path must receive an explicit rule even though the router's safe
+fallback selects both complete product matrices.
 
-- `examples/esp-idf/`
+| Changed path | Product route |
+| --- | --- |
+| `examples/esp-idf/<project>/**` source/configuration | That ESP-IDF project |
+| `examples/arduino/examples/<sketch>/**` source | That Arduino sketch |
+| `examples/arduino/libraries/**` | All first-party Arduino sketches |
+| Product workflow or shared router | Corresponding complete matrix |
+| First-party Markdown, `docs/**`, `assets/**`, `hardware/**`, policy-only files | Policy checks only |
+| `firmware/**` | Visible `firmware_touched` result; no inferred example build |
+| Firmware/archive images such as `.bin` or `.zip` | Firmware result plus explicit release-review flag |
+| Unknown non-documentation path | Both complete matrices and strict policy failure |
 
-For pull requests and pushes, only affected first-party examples are selected.
-Changes to the ESP-IDF workflow, its discovery helper, or shared files under
-`config/` select all 12 examples. The maintained `firmware/brookesia` source
-project is inventoried but intentionally excluded from this default matrix;
-firmware changes need a maintainer-directed workflow and are never inferred
-from a directory name.
+`firmware/brookesia` is a separately maintained delivery/source surface. It is
+inventoried, but it is not treated as another example and does not gain an
+unverified build command merely because its directory contains an ESP-IDF
+project.
 
-Each selected project is built with:
+## ESP-IDF matrix
+
+A first-party ESP-IDF project contains both `CMakeLists.txt` and `main/` and is
+a direct child of `examples/esp-idf/`. Every selected project builds with:
 
 | Setting | Value |
 | --- | --- |
@@ -69,28 +77,21 @@ Each selected project is built with:
 | Target | `esp32p4` |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
 
-Manual runs accept `project=all`, a directory name such as
-`02_HelloWorld`, or a full path such as
-`examples/esp-idf/02_HelloWorld`.
+The default complete route contains 24 jobs: 12 projects times two supported
+ESP-IDF releases. `12_usb_extend_screen` also builds the CI-only
+`vendor-only` configuration with HID touch and UAC audio disabled. This proves
+its conditional source and descriptor path on both IDF releases, bringing a
+complete route to 26 ESP-IDF build jobs.
 
-## Arduino Build Discovery
+Manual runs accept `project=all`, a directory name such as `02_HelloWorld`, or
+a full project path.
 
-The Arduino helper runs:
-
-```bash
-python .github/scripts/discover_arduino_sketches.py
-```
+## Arduino matrix
 
 Only direct children matching
 `examples/arduino/examples/<name>/<name>.ino` are first-party sketches.
-Examples bundled inside third-party libraries are never discovered.
-
-For pull requests and pushes, only affected sketches are selected. A change to
-the Arduino workflow, its discovery helper, or any bundled library under
-`examples/arduino/libraries/` selects all 5 first-party sketches. Manual runs
-accept `sketch=all`, a sketch name, or a full sketch path.
-
-Each selected sketch is compiled twice:
+Examples bundled inside third-party libraries are not discovered. Each selected
+sketch builds for both displays:
 
 | Setting | Value |
 | --- | --- |
@@ -99,5 +100,5 @@ Each selected sketch is compiled twice:
 | Display variants | 3.4C (`SCREEN_3INCH_4_DSI`), 4C (`SCREEN_4INCH_DSI`) |
 | Bundled libraries | `examples/arduino/libraries/` |
 
-The workflow uses the repository copies of Arduino GFX, LVGL, and the board
-display/touch helpers. It does not substitute newer online library versions.
+A complete route is 5 sketches times 2 display variants, or 10 build jobs.
+Manual runs accept `sketch=all`, a sketch name, or a full sketch path.

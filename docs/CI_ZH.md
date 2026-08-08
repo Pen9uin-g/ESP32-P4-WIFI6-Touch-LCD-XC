@@ -2,49 +2,67 @@
 
 [English](CI.md)
 
-GitHub Actions 负责运行仓库检查和产品示例构建。工作流将文档验证与固件编译
-分开，纯文档修改不会消耗产品构建任务。
+本仓库以 GitHub Actions 作为构建结论的权威来源。维护者可以在本地运行 Python
+策略检查，但产品编译证据必须来自修改提交并推送后的 Actions。
 
 ## 工作流
 
 | 工作流 | 用途 |
 | --- | --- |
-| [Documentation and repository policy](../.github/workflows/documentation.yml) | 始终可见的 Markdown、结构和治理检查 |
-| [ESP-IDF projects](../.github/workflows/esp-idf-projects.yml) | 仓库自检、ESP-IDF 示例发现和 ESP32-P4 构建 |
-| [Arduino projects](../.github/workflows/arduino-projects.yml) | 一方 Arduino 示例发现和 ESP32-P4 构建 |
+| [Documentation and repository policy](../.github/workflows/documentation.yml) | 始终可见的单元测试、Markdown、结构和路由策略检查 |
+| [ESP-IDF projects](../.github/workflows/esp-idf-projects.yml) | 按变更选择 ESP32-P4 一方 ESP-IDF 示例构建 |
+| [Arduino projects](../.github/workflows/arduino-projects.yml) | 按变更选择 ESP32-P4 一方 Arduino 示例构建 |
 
-文档工作流会在每个 Pull Request、推送到 `main` 和手动触发时运行。产品构建
-工作流在相关 Pull Request、匹配的 `main` 推送和手动触发时运行。同一 Pull
-Request 有新提交时，会取消过时的在途产品构建。
+三个工作流都会在每个 Pull Request 和推送到 `main` 时启动。产品工作流始终显示
+路由结果，只有路由选中产品工程时才运行昂贵的构建任务。同一 Pull Request 出现
+新提交时会取消过时的在途任务。Pull Request 使用精确的 head SHA，而不是 GitHub
+生成的临时 merge commit。
 
-## 仓库自检
+## 静态策略门禁
 
-文档工作流和 ESP-IDF 工作流都会运行：
+策略工作流会运行：
 
 ```bash
+python -m unittest discover -s .github/tests -p "test_*.py"
 python .github/scripts/repo_self_check.py
+python .github/scripts/audit_markdown.py . --all --config .github/scripts/markdown-audit-config.json
 ```
 
-它会检查仓库级文档、产品图片、CI 脚本和工作流是否存在，生成的 ESP-IDF 输出
-是否被忽略，每个 ESP-IDF 示例的最小结构，一方 Arduino 示例是否有同名 `.ino`
-文件，以及示例索引是否包含全部工程。
+Pull Request 的 Markdown 检查会把 `--all` 换成 base SHA。仓库自检会验证必需文档
+和工作流、生成物忽略规则、12 个直接 ESP-IDF 工程、5 个直接 Arduino 示例以及
+示例索引。
 
-## ESP-IDF 示例发现
+## 完整变更路由
 
-辅助脚本为：
+两个产品工作流和策略工作流共用一个分类器：
 
 ```bash
-python .github/scripts/discover_esp_idf_projects.py
+python .github/scripts/ci_change_router.py --base-ref <base-sha> --head-ref <head-sha>
 ```
 
-默认可构建的 ESP-IDF 示例必须同时包含 `CMakeLists.txt` 和 `main/`，且位于
-`examples/esp-idf/` 下。Pull Request 和推送只选择受影响的一方示例；修改
-ESP-IDF 工作流、发现脚本或 `config/` 下共享配置时，会选择全部 12 个示例。
+分类器读取 `git diff --name-status -z --find-renames`，因此删除和重命名两端都会
+保留原路径的构建影响。无效 ref 或意外空 diff 会作为操作失败退出，不能静默产生
+绿色的零构建结果。策略工作流额外使用 `--strict-unknown`；新出现的未知路径即使
+触发了保守的双全量矩阵，也必须先补充明确分类规则。
 
-`firmware/brookesia` 会被仓库盘点，但不会进入默认示例矩阵。固件源码需要维护者
-明确的固件专用工作流，不能仅因路径名称而自动加入示例 CI。
+| 修改路径 | 产品路由 |
+| --- | --- |
+| `examples/esp-idf/<project>/**` 源码或配置 | 对应 ESP-IDF 工程 |
+| `examples/arduino/examples/<sketch>/**` 源码 | 对应 Arduino 示例 |
+| `examples/arduino/libraries/**` | 全部一方 Arduino 示例 |
+| 产品工作流或共享路由器 | 对应的完整矩阵 |
+| 一方 Markdown、`docs/**`、`assets/**`、`hardware/**`、纯策略文件 | 只运行策略检查 |
+| `firmware/**` | 显示 `firmware_touched`，不推断为示例构建 |
+| `.bin`、`.zip` 等固件/归档镜像 | 固件结果并标记必须显式发布审核 |
+| 未分类的非文档路径 | 双完整矩阵并使严格策略失败 |
 
-每个选择的示例使用以下设置：
+`firmware/brookesia` 是单独维护的交付/源码面。它会被盘点，但不会仅因目录中存在
+ESP-IDF 工程就被当作另一个示例，也不会凭空获得未经验证的构建命令。
+
+## ESP-IDF 矩阵
+
+一方 ESP-IDF 工程必须同时包含 `CMakeLists.txt` 和 `main/`，并且是
+`examples/esp-idf/` 的直接子目录。每个选中的工程使用：
 
 | 设置 | 值 |
 | --- | --- |
@@ -52,20 +70,17 @@ ESP-IDF 工作流、发现脚本或 `config/` 下共享配置时，会选择全�
 | Target | `esp32p4` |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
 
-手动运行可以使用 `project=all`、工程名（如 `02_HelloWorld`）或完整路径。
+默认完整路由包含 24 个任务：12 个工程乘以两个 ESP-IDF 版本。
+`12_usb_extend_screen` 还会使用关闭 HID 触控和 UAC 音频的 CI 专用
+`vendor-only` 配置在两个版本上构建，证明条件源码和描述符路径；因此完整路由一共
+包含 26 个 ESP-IDF 构建任务。
 
-## Arduino 示例发现
+手动运行可以使用 `project=all`、工程名（如 `02_HelloWorld`）或完整工程路径。
 
-辅助脚本为：
+## Arduino 矩阵
 
-```bash
-python .github/scripts/discover_arduino_sketches.py
-```
-
-只有直接匹配 `examples/arduino/examples/<name>/<name>.ino` 的目录是一方示例。
-内置库下的上游示例不会进入矩阵。
-
-每个选择的示例会编译两次：
+只有直接匹配 `examples/arduino/examples/<name>/<name>.ino` 的目录是一方示例，
+第三方库内置示例不会被发现。每个选中的示例会针对两个显示型号构建：
 
 | 设置 | 值 |
 | --- | --- |
@@ -74,5 +89,5 @@ python .github/scripts/discover_arduino_sketches.py
 | 显示变体 | 3.4C（`SCREEN_3INCH_4_DSI`）、4C（`SCREEN_4INCH_DSI`） |
 | 内置库 | `examples/arduino/libraries/` |
 
-工作流使用仓库内的 Arduino GFX、LVGL 和开发板显示/触控辅助库，不会替换为
-在线更新的库版本。
+完整路由为 5 个示例乘以 2 个显示变体，共 10 个构建任务。手动运行可以使用
+`sketch=all`、示例名或完整示例路径。

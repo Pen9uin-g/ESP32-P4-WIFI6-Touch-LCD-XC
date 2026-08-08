@@ -1,0 +1,4 @@
+# CI-only TinyUSB vendor-interface build. The default configuration continues
+# to exercise the HID touch and UAC audio interfaces.
+# CONFIG_HID_TOUCH_ENABLE is not set
+# CONFIG_UAC_AUDIO_ENABLE is not set

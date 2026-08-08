@@ -119,13 +119,31 @@ def classify(path: str, config: dict) -> str:
     return "first_party_customer"
 
 
+def parse_name_status_z(payload: str) -> list[str]:
+    """Return both sides of rename/copy records from git name-status output."""
+
+    fields = payload.split("\0")
+    if fields and fields[-1] == "":
+        fields.pop()
+    paths: list[str] = []
+    index = 0
+    while index < len(fields):
+        status = fields[index]
+        index += 1
+        count = 2 if status[:1] in {"R", "C"} else 1
+        if not status or index + count > len(fields):
+            raise ValueError(f"invalid git name-status record: {status!r}")
+        paths.extend(normalized(path) for path in fields[index:index + count])
+        index += count
+    return sorted(set(paths))
+
+
 def changed_paths(root: Path, scope: str, base: str | None) -> list[str]:
     if scope == "all":
         output = run_git(root, "ls-files", "*.md")
         return sorted({normalized(line) for line in output.splitlines() if line.strip()})
     if scope == "base":
-        output = run_git(root, "diff", "--name-only", f"{base}...HEAD")
-        return sorted({normalized(line) for line in output.splitlines() if line.strip()})
+        return changed_status_paths(root, scope, base)
 
     output = run_git(root, "status", "--porcelain=v1")
     selected: set[str] = set()
@@ -143,8 +161,15 @@ def changed_status_paths(root: Path, scope: str, base: str | None) -> list[str]:
     if scope == "all":
         return []
     if scope == "base":
-        output = run_git(root, "diff", "--name-status", f"{base}...HEAD")
-        return [normalized(line.split("\t", 1)[-1]) for line in output.splitlines() if line.strip()]
+        output = run_git(
+            root,
+            "diff",
+            "--name-status",
+            "-z",
+            "--find-renames",
+            f"{base}...HEAD",
+        )
+        return parse_name_status_z(output)
     return changed_paths(root, scope, base)
 
 
@@ -248,6 +273,29 @@ def docs_only_findings(root: Path, paths: list[str], config: dict) -> list[Findi
     return findings
 
 
+def deleted_pair_findings(root: Path, paths: list[str], config: dict) -> list[Finding]:
+    findings: list[Finding] = []
+    for path in paths:
+        candidate = root / Path(path)
+        if not is_markdown(path) or candidate.exists():
+            continue
+        if classify(path, config) not in FIRST_PARTY or matches(
+            path, config["pair_exempt_patterns"]
+        ):
+            continue
+        counterpart = expected_companion(path)
+        if (root / Path(counterpart)).is_file():
+            findings.append(
+                Finding(
+                    "error",
+                    "BILINGUAL_PAIR_ORPHANED",
+                    path,
+                    f"deleting or renaming this page leaves its companion orphaned: {counterpart}",
+                )
+            )
+    return findings
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repo", type=Path)
@@ -273,6 +321,7 @@ def main() -> int:
     findings: list[Finding] = []
     if args.expect_docs_only:
         findings.extend(docs_only_findings(root, status_paths or paths, config))
+    findings.extend(deleted_pair_findings(root, paths, config))
 
     selected_markdown = [path for path in paths if is_markdown(path) and (root / Path(path)).is_file()]
     classifications = {path: classify(path, config) for path in selected_markdown}

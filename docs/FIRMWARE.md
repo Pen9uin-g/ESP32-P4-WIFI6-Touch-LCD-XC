@@ -11,6 +11,10 @@ surface rather than a routine example.
 - Default ESP-IDF example CI discovers only `examples/esp-idf/`.
 - `firmware/brookesia` is inventoried so maintainers can see its source and build
   configuration, but it is not silently added to the example matrix.
+- Product workflows still publish a visible `firmware_touched` routing result;
+  they skip example builds instead of treating the firmware change as docs-only.
+- A `.bin`, `.zip`, or similar image/archive change also raises the explicit
+  `release_review` flag.
 - Do not change, repackage, or regenerate firmware source, binaries, or delivery
   archives as part of documentation or example-CI maintenance without an explicit
   firmware scope.

@@ -115,13 +115,13 @@ idf.py -p PORT flash monitor
 | 范围 | 当前覆盖 |
 | --- | --- |
 | 仓库自检 | 文档、工程结构与一方 Arduino 示例目录 |
-| ESP-IDF | 12 个一方示例工程，ESP-IDF `v5.5.5` 和 `v6.0.2`，目标 `esp32p4` |
+| ESP-IDF | 12 个一方工程 × ESP-IDF `v5.5.5`/`v6.0.2`，再加 USB vendor-only 配置；完整路由共 26 个任务 |
 | Arduino | 5 个一方示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置 |
 
-纯文档改动只运行始终可见的仓库策略工作流，不运行产品构建。ESP-IDF 或
-Arduino 一方示例及共享构建输入发生改动，或手动选择示例时，才会运行对应
-构建任务；`firmware/` 下维护中的源码工程会被盘点，但不会进入默认示例矩阵；
-配套库自带的上游示例不会进入发现矩阵。工作流发现和手动触发方式请参阅
+每个 Pull Request 都会得到可见的策略、ESP-IDF 路由和 Arduino 路由结论。纯文档
+改动会跳过产品构建；源码或共享构建输入只选择受影响矩阵；未知路径会先保守选择
+双完整矩阵，再使策略检查失败。`firmware/` 下维护中的源码工程会得到可见路由标记，
+但不会进入默认示例矩阵；配套库自带的上游示例不会进入发现矩阵。详细行为请参阅
 [持续集成说明](docs/CI_ZH.md)。
 
 ## 🗂️ 仓库结构
@@ -148,7 +148,6 @@ Arduino 一方示例及共享构建输入发生改动，或手动选择示例时
 - [硬件审计](docs/HARDWARE_ZH.md)
 - [固件源码边界](docs/FIRMWARE_ZH.md)
 - [故障排查](docs/TROUBLESHOOTING_ZH.md)
-- [故障排查](docs/TROUBLESHOOTING.md)
 - [开发板原理图](hardware/schematics/ESP32-P4-WIFI6-Touch-LCD-XC-Schematic.pdf)
 
 ## 🤝 支持与贡献

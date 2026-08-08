@@ -1,0 +1,17 @@
+{
+  "ignore_build_patterns": [
+    ".gitignore",
+    ".github/workflows/documentation.yml",
+    ".github/scripts/audit_markdown.py",
+    ".github/scripts/ci-routing-audit-config.json",
+    ".github/scripts/repo_self_check.py",
+    ".github/tests/**",
+    "**/__pycache__/**",
+    "**/*.pyc"
+  ],
+  "global_build_patterns": [
+    ".github/scripts/ci_change_router.py",
+    ".github/scripts/discover_arduino_sketches.py",
+    ".github/scripts/discover_esp_idf_projects.py"
+  ]
+}

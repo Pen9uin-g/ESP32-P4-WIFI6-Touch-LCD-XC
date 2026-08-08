@@ -2,21 +2,9 @@ name: ESP-IDF projects
 
 on:
   pull_request:
-    paths:
-      - "examples/esp-idf/**"
-      - "config/**"
-      - ".github/workflows/esp-idf-projects.yml"
-      - ".github/scripts/discover_esp_idf_projects.py"
-      - ".github/scripts/repo_self_check.py"
   push:
     branches:
       - main
-    paths:
-      - "examples/esp-idf/**"
-      - "config/**"
-      - ".github/workflows/esp-idf-projects.yml"
-      - ".github/scripts/discover_esp_idf_projects.py"
-      - ".github/scripts/repo_self_check.py"
   workflow_dispatch:
     inputs:
       project:
@@ -36,63 +24,82 @@ jobs:
     name: Repository self-check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Run repository self-check
         run: python .github/scripts/repo_self_check.py
 
   discover:
-    name: Discover ESP-IDF projects
+    name: Route ESP-IDF changes
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.projects.outputs.matrix }}
-      has_projects: ${{ steps.projects.outputs.has_projects }}
-      projects: ${{ steps.projects.outputs.projects }}
+      matrix: ${{ steps.route.outputs.idf_matrix }}
+      has_projects: ${{ steps.route.outputs.has_idf }}
+      projects: ${{ steps.route.outputs.idf_projects }}
+      firmware_touched: ${{ steps.route.outputs.firmware_touched }}
+      release_review: ${{ steps.route.outputs.release_review }}
     steps:
-      - name: Checkout
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      - name: Discover changed ESP-IDF projects
-        id: projects
+      - name: Classify repository changes
+        id: route
         shell: bash
+        env:
+          MANUAL_PROJECT: ${{ inputs.project }}
         run: |
           set -euo pipefail
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            python .github/scripts/discover_esp_idf_projects.py \
-              --project "${{ inputs.project }}"
+            python .github/scripts/ci_change_router.py \
+              --manual-idf "$MANUAL_PROJECT"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            python .github/scripts/discover_esp_idf_projects.py \
+            python .github/scripts/ci_change_router.py \
               --base-ref "${{ github.event.pull_request.base.sha }}" \
-              --head-ref "${{ github.sha }}"
+              --head-ref "${{ github.event.pull_request.head.sha }}"
           else
             before="${{ github.event.before }}"
             if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
-              before=""
+              python .github/scripts/ci_change_router.py --all
+            else
+              python .github/scripts/ci_change_router.py \
+                --base-ref "$before" \
+                --head-ref "${{ github.sha }}"
             fi
-            python .github/scripts/discover_esp_idf_projects.py \
-              --base-ref "$before" \
-              --head-ref "${{ github.sha }}"
           fi
 
       - name: Summary
         shell: bash
+        env:
+          SELECTED_PROJECTS: ${{ steps.route.outputs.idf_projects }}
         run: |
-          if [[ "${{ steps.projects.outputs.has_projects }}" == "true" ]]; then
+          if [[ "${{ steps.route.outputs.has_idf }}" == "true" ]]; then
             {
               echo "### ESP-IDF projects selected"
               echo
-              echo '${{ steps.projects.outputs.projects }}' | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
+              printf '%s\n' "$SELECTED_PROJECTS" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
+              echo
+              echo "Each selected project builds with ESP-IDF v5.5.5 and v6.0.2."
+              echo "The USB extend-screen project also builds its vendor-only configuration."
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No ESP-IDF project changes detected." >> "$GITHUB_STEP_SUMMARY"
+            echo "No ESP-IDF example build was selected." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "${{ steps.route.outputs.firmware_touched }}" == "true" ]]; then
+            echo "Maintained firmware changed; it remains outside the example matrix." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "${{ steps.route.outputs.release_review }}" == "true" ]]; then
+            echo "Binary or archive changes require explicit release review." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   build:
-    name: Build ${{ matrix.project }} (${{ matrix.idf_version }})
+    name: Build ${{ matrix.project_name }} / ${{ matrix.configuration }} (${{ matrix.idf_version }})
     needs:
       - self-check
       - discover
@@ -102,8 +109,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
     steps:
-      - name: Checkout
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Build with ESP-IDF
         uses: espressif/esp-idf-ci-action@v1
@@ -111,3 +120,4 @@ jobs:
           esp_idf_version: ${{ matrix.idf_version }}
           target: esp32p4
           path: ${{ matrix.project }}
+          command: ${{ matrix.command }}

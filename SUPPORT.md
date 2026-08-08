@@ -16,5 +16,6 @@ For a reproducible repository issue, open a GitHub issue and include:
 - whether the image came from source-built CI output or a factory/recovery image.
 
 Do not publish passwords, access tokens, private keys, personal serial numbers,
-or other sensitive device data in an issue. Use the security process for
-vulnerability reports.
+or other sensitive device data in an issue. This repository does not currently
+advertise a verified private vulnerability-reporting channel; do not put
+credentials or unreleased vulnerability details in a public issue.

@@ -22,11 +22,13 @@ REQUIRED_FILES = (
     Path("docs/TROUBLESHOOTING.md"),
     Path("examples/README.md"),
     Path("examples/arduino/README.md"),
-    Path(".github/scripts/discover_arduino_sketches.py"),
-    Path(".github/scripts/discover_esp_idf_projects.py"),
     Path(".github/scripts/audit_markdown.py"),
+    Path(".github/scripts/ci_change_router.py"),
+    Path(".github/scripts/ci-routing-audit-config.json"),
     Path(".github/scripts/markdown-audit-config.json"),
     Path(".github/scripts/repo_self_check.py"),
+    Path(".github/tests/test_audit_markdown.py"),
+    Path(".github/tests/test_ci_change_router.py"),
     Path(".github/ISSUE_TEMPLATE/bug_report.md"),
     Path(".github/ISSUE_TEMPLATE/bug_report_ZH.md"),
     Path(".github/pull_request_template.md"),
@@ -36,8 +38,6 @@ REQUIRED_FILES = (
     Path(".github/workflows/esp-idf-projects.yml"),
     Path("CONTRIBUTING.md"),
     Path("CONTRIBUTING_ZH.md"),
-    Path("SECURITY.md"),
-    Path("SECURITY_ZH.md"),
     Path("SUPPORT.md"),
     Path("SUPPORT_ZH.md"),
     Path("docs/CI_ZH.md"),
@@ -55,6 +55,7 @@ REQUIRED_FILES = (
     Path("examples/esp-idf/09_video_lcd_display/README_ZH.md"),
     Path("examples/esp-idf/10_mp4_player/README_ZH.md"),
     Path("examples/esp-idf/11_esp_brookesia_phone/README_ZH.md"),
+    Path("examples/esp-idf/12_usb_extend_screen/sdkconfig.ci.vendor-only"),
 )
 
 REQUIRED_GITIGNORE_PATTERNS = {
@@ -62,6 +63,9 @@ REQUIRED_GITIGNORE_PATTERNS = {
     "**/managed_components",
     "**/dependencies.lock",
     "**/sdkconfig",
+    "**/sdkconfig.old",
+    "**/__pycache__",
+    "**/*.pyc",
 }
 
 

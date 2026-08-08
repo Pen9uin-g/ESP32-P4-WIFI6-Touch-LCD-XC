@@ -126,16 +126,16 @@ platform guidance.
 | Surface | Current coverage |
 | --- | --- |
 | Repository self-check | Documentation, project structure, and first-party sketch layout |
-| ESP-IDF | 12 first-party example projects with ESP-IDF `v5.5.5` and `v6.0.2`, target `esp32p4` |
+| ESP-IDF | 12 first-party projects × ESP-IDF `v5.5.5`/`v6.0.2`, plus the USB vendor-only configuration: 26 jobs on a complete route |
 | Arduino | 5 first-party sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays |
 
-Documentation-only changes run the always-visible repository policy workflow
-without starting product builds. ESP-IDF and Arduino build jobs run when their
-first-party examples or shared build inputs change, or when selected manually.
-The maintained `firmware/` source project is inventoried but is intentionally
-outside the default example matrix. Bundled library examples are excluded from
-discovery. See [Continuous Integration](docs/CI.md) for workflow discovery and
-dispatch behavior.
+Every pull request gets visible policy, ESP-IDF-routing, and Arduino-routing
+results. Documentation-only changes skip product build jobs. Source or shared
+build-input changes select the affected matrix, and unknown paths fail policy
+after conservatively selecting both complete matrices. The maintained
+`firmware/` source project receives a visible routing flag but remains outside
+the default example matrix. Bundled library examples are excluded from
+discovery. See [Continuous Integration](docs/CI.md) for exact behavior.
 
 ## 🗂️ Repository Layout
 

@@ -11,4 +11,7 @@
 **/managed_components
 **/dependencies.lock
 **/sdkconfig
+**/sdkconfig.old
+**/__pycache__
+**/*.pyc
 **/.codex/pdf-preview-cache

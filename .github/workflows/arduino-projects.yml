@@ -2,19 +2,9 @@ name: Arduino projects
 
 on:
   pull_request:
-    paths:
-      - "examples/arduino/examples/**"
-      - "examples/arduino/libraries/**"
-      - ".github/workflows/arduino-projects.yml"
-      - ".github/scripts/discover_arduino_sketches.py"
   push:
     branches:
       - main
-    paths:
-      - "examples/arduino/examples/**"
-      - "examples/arduino/libraries/**"
-      - ".github/workflows/arduino-projects.yml"
-      - ".github/scripts/discover_arduino_sketches.py"
   workflow_dispatch:
     inputs:
       sketch:
@@ -36,54 +26,68 @@ env:
 
 jobs:
   discover:
-    name: Discover Arduino sketches
+    name: Route Arduino changes
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.sketches.outputs.matrix }}
-      has_sketches: ${{ steps.sketches.outputs.has_sketches }}
-      sketches: ${{ steps.sketches.outputs.sketches }}
+      matrix: ${{ steps.route.outputs.arduino_matrix }}
+      has_sketches: ${{ steps.route.outputs.has_arduino }}
+      sketches: ${{ steps.route.outputs.arduino_sketches }}
+      firmware_touched: ${{ steps.route.outputs.firmware_touched }}
+      release_review: ${{ steps.route.outputs.release_review }}
     steps:
-      - name: Checkout
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      - name: Discover changed Arduino sketches
-        id: sketches
+      - name: Classify repository changes
+        id: route
         shell: bash
+        env:
+          MANUAL_SKETCH: ${{ inputs.sketch }}
         run: |
           set -euo pipefail
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            python .github/scripts/discover_arduino_sketches.py \
-              --sketch "${{ inputs.sketch }}"
+            python .github/scripts/ci_change_router.py \
+              --manual-arduino "$MANUAL_SKETCH"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            python .github/scripts/discover_arduino_sketches.py \
+            python .github/scripts/ci_change_router.py \
               --base-ref "${{ github.event.pull_request.base.sha }}" \
-              --head-ref "${{ github.sha }}"
+              --head-ref "${{ github.event.pull_request.head.sha }}"
           else
             before="${{ github.event.before }}"
             if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
-              before=""
+              python .github/scripts/ci_change_router.py --all
+            else
+              python .github/scripts/ci_change_router.py \
+                --base-ref "$before" \
+                --head-ref "${{ github.sha }}"
             fi
-            python .github/scripts/discover_arduino_sketches.py \
-              --base-ref "$before" \
-              --head-ref "${{ github.sha }}"
           fi
 
       - name: Summary
         shell: bash
+        env:
+          SELECTED_SKETCHES: ${{ steps.route.outputs.arduino_sketches }}
         run: |
-          if [[ "${{ steps.sketches.outputs.has_sketches }}" == "true" ]]; then
+          if [[ "${{ steps.route.outputs.has_arduino }}" == "true" ]]; then
             {
               echo "### Arduino sketches selected"
               echo
-              echo '${{ steps.sketches.outputs.sketches }}' | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
+              printf '%s\n' "$SELECTED_SKETCHES" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
               echo
               echo "Each sketch is compiled for the 3.4C and 4C displays."
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No Arduino sketch changes detected." >> "$GITHUB_STEP_SUMMARY"
+            echo "No Arduino sketch build was selected." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "${{ steps.route.outputs.firmware_touched }}" == "true" ]]; then
+            echo "Maintained firmware changed; it remains outside the example matrix." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "${{ steps.route.outputs.release_review }}" == "true" ]]; then
+            echo "Binary or archive changes require explicit release review." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   build:
@@ -95,8 +99,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
     steps:
-      - name: Checkout
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Arduino CLI
         uses: arduino/setup-arduino-cli@v2
@@ -111,10 +117,15 @@ jobs:
 
       - name: Compile sketch
         shell: bash
+        env:
+          SKETCH_NAME: ${{ matrix.sketch_name }}
+          SKETCH_PATH: ${{ matrix.sketch }}
+          SCREEN_NAME: ${{ matrix.screen }}
+          SCREEN_DEFINE: ${{ matrix.screen_define }}
         run: |
           set -euo pipefail
           library_root="$GITHUB_WORKSPACE/examples/arduino/libraries"
-          build_path="$RUNNER_TEMP/arduino-build/${{ matrix.sketch_name }}/${{ matrix.screen }}"
+          build_path="$RUNNER_TEMP/arduino-build/$SKETCH_NAME/$SCREEN_NAME"
 
           arduino-cli compile \
             --fqbn "$ARDUINO_FQBN" \
@@ -122,5 +133,5 @@ jobs:
             --libraries "$library_root" \
             --build-path "$build_path" \
             --build-property "compiler.c.extra_flags=-I$library_root" \
-            --build-property "compiler.cpp.extra_flags=-I$library_root -DCURRENT_SCREEN=${{ matrix.screen_define }}" \
-            "${{ matrix.sketch }}"
+            --build-property "compiler.cpp.extra_flags=-I$library_root -DCURRENT_SCREEN=$SCREEN_DEFINE" \
+            "$SKETCH_PATH"

@@ -22,10 +22,36 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+
+      - name: Run repository policy unit tests
+        run: python -m unittest discover -s .github/tests -p "test_*.py"
 
       - name: Run repository self-check
         run: python .github/scripts/repo_self_check.py
+
+      - name: Verify change routing is complete
+        if: github.event_name != 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            python .github/scripts/ci_change_router.py \
+              --base-ref "${{ github.event.pull_request.base.sha }}" \
+              --head-ref "${{ github.event.pull_request.head.sha }}" \
+              --strict-unknown
+          else
+            before="${{ github.event.before }}"
+            if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
+              python .github/scripts/ci_change_router.py --all --strict-unknown
+            else
+              python .github/scripts/ci_change_router.py \
+                --base-ref "$before" \
+                --head-ref "${{ github.sha }}" \
+                --strict-unknown
+            fi
+          fi
 
       - name: Audit changed Markdown on pull requests
         if: github.event_name == 'pull_request'

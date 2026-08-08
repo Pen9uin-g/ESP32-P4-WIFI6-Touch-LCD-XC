@@ -48,6 +48,13 @@ static uint16_t touch_strength[MAX_TOUCH_POINTS] = { 0 };
 static uint8_t touch_cnt = 0;
 static bool touch_pressed = false;
 
+static void haltWithError(const char *message) {
+  Serial.println(message);
+  while (true) {
+    delay(1000);
+  }
+}
+
 void my_disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map) {
   uint32_t w = (area->x2 - area->x1 + 1);
   uint32_t h = (area->y2 - area->y1 + 1);
@@ -85,26 +92,33 @@ void setup(void) {
   tp_handle = touch_gt911_init(port);
 
   if (!gfx->begin()) {
-    Serial.println("gfx->begin() failed!");
+    haltWithError("gfx->begin() failed!");
   }
 
   lv_init();
 
-  size_t draw_buf_size = display_cfg.width * DRAW_BUF_HEIGHT;
-  lv_draw_buf1 = (lv_color_t *)heap_caps_malloc(draw_buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
-  if (!lv_draw_buf1) {
-    Serial.println("LVGL draw buffer 1 allocation failed!");
-  }
-  
-  lv_draw_buf2 = (lv_color_t *)heap_caps_malloc(draw_buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
-  if (!lv_draw_buf2) {
-    Serial.println("LVGL draw buffer 2 allocation failed!");
-    heap_caps_free(lv_draw_buf1);
+  const size_t draw_buf_pixels = display_cfg.width * DRAW_BUF_HEIGHT;
+  const size_t draw_buf_bytes = draw_buf_pixels * sizeof(lv_color_t);
+  lv_draw_buf1 = (lv_color_t *)heap_caps_malloc(draw_buf_bytes, MALLOC_CAP_SPIRAM);
+  lv_draw_buf2 = (lv_color_t *)heap_caps_malloc(draw_buf_bytes, MALLOC_CAP_SPIRAM);
+  if (!lv_draw_buf1 || !lv_draw_buf2) {
+    if (lv_draw_buf1) {
+      heap_caps_free(lv_draw_buf1);
+      lv_draw_buf1 = NULL;
+    }
+    if (lv_draw_buf2) {
+      heap_caps_free(lv_draw_buf2);
+      lv_draw_buf2 = NULL;
+    }
+    haltWithError("LVGL draw buffer allocation failed!");
   }
 
   lv_display = lv_display_create(display_cfg.width, display_cfg.height);
+  if (!lv_display) {
+    haltWithError("LVGL display allocation failed!");
+  }
   lv_display_set_flush_cb(lv_display, my_disp_flush);
-  lv_display_set_buffers(lv_display, lv_draw_buf1, lv_draw_buf2, draw_buf_size, LV_DISPLAY_RENDER_MODE_PARTIAL);
+  lv_display_set_buffers(lv_display, lv_draw_buf1, lv_draw_buf2, draw_buf_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
 
   indev_touchpad = lv_indev_create();
   lv_indev_set_type(indev_touchpad, LV_INDEV_TYPE_POINTER);
