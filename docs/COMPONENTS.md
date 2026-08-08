@@ -25,11 +25,10 @@ snapshot, with an additional dependency. A future managed-component migration
 must compare exported APIs, Kconfig, GPIO23 behavior, both ESP-IDF lines, P4
 revision requirements, and both display variants before changing the boundary.
 
-The USB extend-screen example also pins `espressif/tinyusb` to `0.19.0~3`.
-That is the registry release exercised by the current CI baseline; keeping it
-exact prevents a future TinyUSB upload from silently changing USB descriptors
-or P4 PHY behavior. Its existing `espressif/usb_device_uac` dependency remains
-at `1.2.0`.
+The USB extend-screen example also pins `espressif/tinyusb` to `0.17.0~2`, the
+exact release permitted by its `espressif/usb_device_uac` `1.2.0` dependency.
+Keeping both versions exact prevents a future TinyUSB upload from silently
+changing USB descriptors or P4 PHY behavior.
 
 ## Product-local or example-local components
 

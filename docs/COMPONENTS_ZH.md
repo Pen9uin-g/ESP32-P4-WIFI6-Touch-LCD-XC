@@ -20,9 +20,9 @@
 未来迁移到 managed component 前，必须核对导出 API、Kconfig、GPIO23 行为、两条
 ESP-IDF 版本线、P4 revision 要求以及两个显示型号。
 
-USB 扩展屏示例还把 `espressif/tinyusb` 精确固定为 `0.19.0~3`。这是当前 CI 基线
-实际覆盖的 registry 版本，精确版本可避免未来 TinyUSB 上传静默改变 USB 描述符或
-P4 PHY 行为；现有 `espressif/usb_device_uac` 依赖继续保持 `1.2.0`。
+USB 扩展屏示例还把 `espressif/tinyusb` 精确固定为 `0.17.0~2`，这是现有
+`espressif/usb_device_uac` `1.2.0` 允许的精确版本。两者都使用精确版本，可避免
+未来 TinyUSB 上传静默改变 USB 描述符或 P4 PHY 行为。
 
 ## 产品或示例本地组件
 
