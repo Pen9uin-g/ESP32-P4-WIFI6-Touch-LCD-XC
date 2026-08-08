@@ -70,10 +70,11 @@ ESP-IDF 工程就被当作另一个示例，也不会凭空获得未经验证的
 | Target | `esp32p4` |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
 
-默认完整路由包含 24 个任务：12 个工程乘以两个 ESP-IDF 版本。
+基础完整路由包含 24 个任务：12 个工程乘以两个 ESP-IDF 版本。
+`11_esp_brookesia_phone` 除默认 3.4C 配置外，还会构建 4C 显示配置；
 `12_usb_extend_screen` 还会使用关闭 HID 触控和 UAC 音频的 CI 专用
-`vendor-only` 配置在两个版本上构建，证明条件源码和描述符路径；因此完整路由一共
-包含 26 个 ESP-IDF 构建任务。
+`vendor-only` 配置，并在依赖解析阶段省略托管 UAC 组件。两条可选路径在两个 IDF
+版本上共增加 4 个任务，因此完整路由包含 28 个 ESP-IDF 构建任务。
 
 手动运行可以使用 `project=all`、工程名（如 `02_HelloWorld`）或完整工程路径。
 

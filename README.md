@@ -126,7 +126,7 @@ platform guidance.
 | Surface | Current coverage |
 | --- | --- |
 | Repository self-check | Documentation, project structure, and first-party sketch layout |
-| ESP-IDF | 12 first-party projects × ESP-IDF `v5.5.5`/`v6.0.2`, plus the USB vendor-only configuration: 26 jobs on a complete route |
+| ESP-IDF | 12 first-party projects × ESP-IDF `v5.5.5`/`v6.0.2`, plus Brookesia 3.4C/4C and USB vendor-only coverage: 28 jobs on a complete route |
 | Arduino | 5 first-party sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays |
 
 Every pull request gets visible policy, ESP-IDF-routing, and Arduino-routing

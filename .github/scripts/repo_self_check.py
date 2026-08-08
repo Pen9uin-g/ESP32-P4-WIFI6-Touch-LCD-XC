@@ -55,6 +55,7 @@ REQUIRED_FILES = (
     Path("examples/esp-idf/09_video_lcd_display/README_ZH.md"),
     Path("examples/esp-idf/10_mp4_player/README_ZH.md"),
     Path("examples/esp-idf/11_esp_brookesia_phone/README_ZH.md"),
+    Path("examples/esp-idf/11_esp_brookesia_phone/sdkconfig.ci.4c"),
     Path("examples/esp-idf/12_usb_extend_screen/sdkconfig.ci.vendor-only"),
 )
 

@@ -22,7 +22,10 @@ upstream project.
 
 ## Configure, build, and flash
 
-Run `idf.py menuconfig` to review the ESP-Brookesia and board settings, then:
+The checked-in default selects the 3.4C 800 × 800 display and the board's
+32 MB NOR flash. Select **Board Support Package Configuration → LCD → Select
+LCD type → 720 × 720 4-inch Display** for the 4C variant. Run
+`idf.py menuconfig` to review the ESP-Brookesia and board settings, then:
 
 ```bash
 idf.py set-target esp32p4
@@ -36,5 +39,6 @@ managed dependencies; a separate clone of the upstream example is not required
 for this project build.
 
 The example is included in the repository's ESP-IDF `v5.5.5` and `v6.0.2`
-matrix. CI validates compilation; it does not replace a physical display,
-touch, audio, or Wi-Fi compatibility test.
+matrix for both the 3.4C and 4C display configurations. CI validates
+compilation; it does not replace a physical display, touch, audio, or Wi-Fi
+compatibility test.

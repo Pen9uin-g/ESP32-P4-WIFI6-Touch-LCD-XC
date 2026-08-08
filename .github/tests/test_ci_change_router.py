@@ -12,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "scripts" / "ci_change_router.py"
+IDF_WORKFLOW = ROOT / ".github" / "workflows" / "esp-idf-projects.yml"
 SPEC = importlib.util.spec_from_file_location("ci_change_router", SCRIPT)
 assert SPEC and SPEC.loader
 router = importlib.util.module_from_spec(SPEC)
@@ -34,8 +35,33 @@ class RouterTests(unittest.TestCase):
     def test_inventory_and_complete_matrix_sizes(self) -> None:
         self.assertEqual(12, len(self.idf))
         self.assertEqual(5, len(self.arduino))
-        self.assertEqual(26, len(router.idf_matrix(sorted(self.idf))["include"]))
+        self.assertEqual(28, len(router.idf_matrix(sorted(self.idf))["include"]))
         self.assertEqual(10, len(router.arduino_matrix(sorted(self.arduino))["include"]))
+
+    def test_phone_matrix_has_34c_and_4c_configurations(self) -> None:
+        entries = router.idf_matrix([router.PHONE_PROJECT])["include"]
+        self.assertEqual(4, len(entries))
+        display_34c = [entry for entry in entries if entry["configuration"] == "3.4C"]
+        display_4c = [entry for entry in entries if entry["configuration"] == "4C"]
+        self.assertEqual(2, len(display_34c))
+        self.assertTrue(all(entry["command"] == "idf.py build" for entry in display_34c))
+        self.assertEqual(2, len(display_4c))
+        self.assertTrue(
+            all("sdkconfig.defaults;sdkconfig.ci.4c" in entry["command"] for entry in display_4c)
+        )
+
+    def test_phone_display_and_flash_defaults_match_the_product(self) -> None:
+        project = ROOT / router.PHONE_PROJECT
+        defaults = (project / "sdkconfig.defaults").read_text(encoding="utf-8")
+        display_4c = (project / "sdkconfig.ci.4c").read_text(encoding="utf-8")
+        self.assertIn("CONFIG_ESPTOOLPY_FLASHSIZE_32MB=y", defaults)
+        self.assertIn('CONFIG_ESPTOOLPY_FLASHSIZE="32MB"', defaults)
+        self.assertIn("CONFIG_BSP_LCD_TYPE_800_800_3_4_INCH=y", defaults)
+        self.assertNotIn("720_1280_7_INCH", defaults)
+        self.assertIn("CONFIG_BSP_LCD_TYPE_720_720_4_INCH=y", display_4c)
+        self.assertIn(
+            "# CONFIG_BSP_LCD_TYPE_800_800_3_4_INCH is not set", display_4c
+        )
 
     def test_usb_vendor_only_matrix_is_explicit(self) -> None:
         entries = router.idf_matrix([router.USB_PROJECT])["include"]
@@ -43,6 +69,20 @@ class RouterTests(unittest.TestCase):
         vendor = [entry for entry in entries if entry["configuration"] == "vendor-only"]
         self.assertEqual(2, len(vendor))
         self.assertTrue(all("sdkconfig.ci.vendor-only" in entry["command"] for entry in vendor))
+        self.assertTrue(
+            all("USB_DEVICE_UAC_COMPONENT=OFF" in entry["command"] for entry in vendor)
+        )
+
+    def test_usb_vendor_only_component_dependency_contract(self) -> None:
+        project = ROOT / router.USB_PROJECT
+        cmake = (project / "CMakeLists.txt").read_text(encoding="utf-8")
+        manifest = (project / "main" / "idf_component.yml").read_text(encoding="utf-8")
+        overlay = (project / "sdkconfig.ci.vendor-only").read_text(encoding="utf-8")
+        self.assertIn('option(USB_DEVICE_UAC_COMPONENT', cmake)
+        self.assertIn('set(ENV{USB_DEVICE_UAC_COMPONENT} "enabled")', cmake)
+        self.assertIn('set(ENV{USB_DEVICE_UAC_COMPONENT} "disabled")', cmake)
+        self.assertIn('$USB_DEVICE_UAC_COMPONENT == enabled', manifest)
+        self.assertIn("# CONFIG_UAC_AUDIO_ENABLE is not set", overlay)
 
     def test_parse_name_status_preserves_both_rename_sides(self) -> None:
         changes = router.parse_name_status_z(
@@ -60,6 +100,20 @@ class RouterTests(unittest.TestCase):
     def test_documentation_only_selects_no_product_builds(self) -> None:
         route = router.route_changes(
             [router.Change("M", ("README.md",)), router.Change("M", ("docs/CI.md",))],
+            self.idf,
+            self.arduino,
+        )
+        self.assertTrue(route["docs_only"])
+        self.assertEqual([], route["idf_projects"])
+        self.assertEqual([], route["arduino_sketches"])
+
+    def test_markdown_inside_projects_and_bundled_libraries_selects_no_builds(self) -> None:
+        route = router.route_changes(
+            [
+                router.Change("M", ("examples/esp-idf/02_HelloWorld/README.md",)),
+                router.Change("M", ("examples/arduino/examples/HelloWorld/README.md",)),
+                router.Change("M", ("examples/arduino/libraries/display/README.md",)),
+            ],
             self.idf,
             self.arduino,
         )
@@ -89,6 +143,23 @@ class RouterTests(unittest.TestCase):
         )
         self.assertEqual(sorted(self.arduino), route["arduino_sketches"])
         self.assertEqual([], route["idf_projects"])
+
+    def test_global_workflow_and_shared_router_inputs_select_expected_matrices(self) -> None:
+        workflow_route = router.route_changes(
+            [router.Change("M", (".github/workflows/esp-idf-projects.yml",))],
+            self.idf,
+            self.arduino,
+        )
+        self.assertEqual(sorted(self.idf), workflow_route["idf_projects"])
+        self.assertEqual([], workflow_route["arduino_sketches"])
+
+        router_route = router.route_changes(
+            [router.Change("M", (".github/scripts/ci_change_router.py",))],
+            self.idf,
+            self.arduino,
+        )
+        self.assertEqual(sorted(self.idf), router_route["idf_projects"])
+        self.assertEqual(sorted(self.arduino), router_route["arduino_sketches"])
 
     def test_rename_and_deletion_route_using_old_paths(self) -> None:
         project = "examples/esp-idf/03_i2c_tools"
@@ -131,21 +202,25 @@ class RouterTests(unittest.TestCase):
         self.assertEqual(sorted(self.arduino), route["arduino_sketches"])
         self.assertEqual(["new_product/source.c"], route["unknown_paths"])
 
-    def run_cli(self, changed_text: str, *extra: str) -> subprocess.CompletedProcess[str]:
+    def test_hex_is_not_a_release_artifact(self) -> None:
+        route = router.route_changes(
+            [router.Change("A", ("release/diagnostic.hex",))],
+            self.idf,
+            self.arduino,
+        )
+        self.assertEqual([], route["release_paths"])
+
+    def run_router_cli(self, *args: str) -> subprocess.CompletedProcess[str]:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
-            changed = temp / "changed.txt"
             output = temp / "github-output.txt"
-            changed.write_text(changed_text, encoding="utf-8")
             env = os.environ.copy()
             env["GITHUB_OUTPUT"] = str(output)
             result = subprocess.run(
                 [
                     sys.executable,
                     str(SCRIPT),
-                    "--changed-files-from",
-                    str(changed),
-                    *extra,
+                    *args,
                 ],
                 cwd=ROOT,
                 env=env,
@@ -156,6 +231,12 @@ class RouterTests(unittest.TestCase):
             )
             result.github_output = output.read_text(encoding="utf-8") if output.exists() else ""
             return result
+
+    def run_cli(self, changed_text: str, *extra: str) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            changed = Path(temp_dir) / "changed.txt"
+            changed.write_text(changed_text, encoding="utf-8")
+            return self.run_router_cli("--changed-files-from", str(changed), *extra)
 
     def test_cli_writes_exact_github_outputs(self) -> None:
         result = self.run_cli("M\tREADME.md\n")
@@ -179,6 +260,23 @@ class RouterTests(unittest.TestCase):
         result = self.run_cli("A\tnew_product/source.c\n", "--strict-unknown")
         self.assertEqual(3, result.returncode)
         self.assertIn("Unclassified paths", result.stderr)
+
+    def test_cli_manual_and_all_routes_emit_complete_matrices(self) -> None:
+        manual = self.run_router_cli("--manual-idf", router.PHONE_PROJECT)
+        self.assertEqual(0, manual.returncode, manual.stderr)
+        self.assertEqual(4, len(json.loads(manual.stdout)["idf_matrix"]["include"]))
+
+        all_projects = self.run_router_cli("--all")
+        self.assertEqual(0, all_projects.returncode, all_projects.stderr)
+        self.assertEqual(28, len(json.loads(all_projects.stdout)["idf_matrix"]["include"]))
+
+    def test_esp_idf_workflow_consumes_router_cli_outputs(self) -> None:
+        workflow = IDF_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn('--manual-idf "$MANUAL_PROJECT"', workflow)
+        self.assertIn("ci_change_router.py --all", workflow)
+        self.assertIn("matrix: ${{ steps.route.outputs.idf_matrix }}", workflow)
+        self.assertIn("if: needs.discover.outputs.has_projects == 'true'", workflow)
+        self.assertIn("command: ${{ matrix.command }}", workflow)
 
 
 if __name__ == "__main__":

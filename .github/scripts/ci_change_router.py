@@ -27,8 +27,13 @@ SCREEN_VARIANTS = (
     {"screen": "4C", "screen_define": "SCREEN_4INCH_DSI"},
 )
 USB_PROJECT = "examples/esp-idf/12_usb_extend_screen"
+PHONE_PROJECT = "examples/esp-idf/11_esp_brookesia_phone"
+PHONE_4C_COMMAND = (
+    'idf.py -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.ci.4c" build'
+)
 USB_VENDOR_ONLY_COMMAND = (
-    'idf.py -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;'
+    'idf.py -D "USB_DEVICE_UAC_COMPONENT=OFF" '
+    '-D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;'
     'sdkconfig.defaults.esp32p4;sdkconfig.ci.vendor-only" build'
 )
 
@@ -67,7 +72,6 @@ RELEASE_SUFFIXES = (
     ".bin",
     ".elf",
     ".gz",
-    ".hex",
     ".img",
     ".map",
     ".tar",
@@ -317,7 +321,10 @@ def normalize_selection(value: str, known_items: set[str], kind: str) -> list[st
 def idf_matrix(projects: list[str]) -> dict[str, list[dict[str, str]]]:
     include: list[dict[str, str]] = []
     for project in projects:
-        configurations = [("default", "idf.py build")]
+        if project == PHONE_PROJECT:
+            configurations = [("3.4C", "idf.py build"), ("4C", PHONE_4C_COMMAND)]
+        else:
+            configurations = [("default", "idf.py build")]
         if project == USB_PROJECT:
             configurations.append(("vendor-only", USB_VENDOR_ONLY_COMMAND))
         for configuration, command in configurations:

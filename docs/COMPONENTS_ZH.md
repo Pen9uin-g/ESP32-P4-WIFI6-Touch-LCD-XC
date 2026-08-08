@@ -22,7 +22,13 @@ ESP-IDF 版本线、P4 revision 要求以及两个显示型号。
 
 USB 扩展屏示例还把 `espressif/tinyusb` 精确固定为 `0.17.0~2`，这是现有
 `espressif/usb_device_uac` `1.2.0` 允许的精确版本。两者都使用精确版本，可避免
-未来 TinyUSB 上传静默改变 USB 描述符或 P4 PHY 行为。
+未来 TinyUSB 上传静默改变 USB 描述符或 P4 PHY 行为。UAC 组件依赖受
+顶层 `USB_DEVICE_UAC_COMPONENT` CMake 选项控制。常规构建保持启用；CI 的
+vendor-only 命令同时关闭该选项与 `CONFIG_UAC_AUDIO_ENABLE`，因此不会再编译一个
+其描述符类型已被项目 TinyUSB 配置关闭的组件。这里使用 CMake 选项，是因为基于
+Kconfig 的 manifest 条件要求 ESP-IDF 6.0，而本仓库还要验证 ESP-IDF 5.5；详情见
+Component Manager 的
+[Kconfig 条件说明](https://docs.espressif.com/projects/idf-component-manager/en/latest/reference/manifest_file.html#kconfig-options)。
 
 ## 产品或示例本地组件
 

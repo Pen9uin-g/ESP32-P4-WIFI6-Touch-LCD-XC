@@ -20,7 +20,10 @@
 
 ## 配置、编译与烧录
 
-运行 `idf.py menuconfig` 检查 ESP-Brookesia 和板级设置，然后执行：
+仓库默认配置选择 3.4C 的 800 × 800 显示屏和开发板实际的 32 MB NOR Flash。
+4C 型号请在 **Board Support Package Configuration → LCD → Select LCD type**
+中选择 **720 × 720 4-inch Display**。运行 `idf.py menuconfig` 检查
+ESP-Brookesia 和板级设置，然后执行：
 
 ```bash
 idf.py set-target esp32p4
@@ -31,5 +34,5 @@ idf.py -p PORT flash monitor
 将 `PORT` 替换为开发板串口。退出串口监视器请按 `Ctrl-]`。仓库已经包含产品
 示例集成并声明所需的托管依赖，构建此工程不需要另外克隆上游示例。
 
-该示例进入仓库 ESP-IDF `v5.5.5` 和 `v6.0.2` 矩阵。CI 验证可以编译，不能替代
-实体显示、触控、音频或 Wi-Fi 兼容性测试。
+该示例的 3.4C 与 4C 两种显示配置都会进入仓库 ESP-IDF `v5.5.5` 和 `v6.0.2`
+矩阵。CI 验证可以编译，不能替代实体显示、触控、音频或 Wi-Fi 兼容性测试。

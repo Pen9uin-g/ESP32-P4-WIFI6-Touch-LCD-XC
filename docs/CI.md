@@ -77,11 +77,14 @@ a direct child of `examples/esp-idf/`. Every selected project builds with:
 | Target | `esp32p4` |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
 
-The default complete route contains 24 jobs: 12 projects times two supported
-ESP-IDF releases. `12_usb_extend_screen` also builds the CI-only
-`vendor-only` configuration with HID touch and UAC audio disabled. This proves
-its conditional source and descriptor path on both IDF releases, bringing a
-complete route to 26 ESP-IDF build jobs.
+The baseline complete route contains 24 jobs: 12 projects times two supported
+ESP-IDF releases. `11_esp_brookesia_phone` additionally builds its 4C display
+configuration alongside the default 3.4C configuration, and
+`12_usb_extend_screen` additionally builds the CI-only `vendor-only`
+configuration with HID touch and UAC audio disabled and the managed UAC
+component omitted during dependency resolution. These optional paths add four
+jobs across the two IDF releases, bringing a complete route to 28 ESP-IDF build
+jobs.
 
 Manual runs accept `project=all`, a directory name such as `02_HelloWorld`, or
 a full project path.

@@ -4,8 +4,10 @@
     ".github/workflows/documentation.yml",
     ".github/scripts/audit_markdown.py",
     ".github/scripts/ci-routing-audit-config.json",
+    ".github/scripts/markdown-audit-config.json",
     ".github/scripts/repo_self_check.py",
     ".github/tests/**",
+    "assets/ESP32-P4-WIFI6-Touch-LCD-XC.jpg",
     "**/__pycache__/**",
     "**/*.pyc"
   ],

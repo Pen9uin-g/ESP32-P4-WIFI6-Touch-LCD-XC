@@ -28,7 +28,14 @@ revision requirements, and both display variants before changing the boundary.
 The USB extend-screen example also pins `espressif/tinyusb` to `0.17.0~2`, the
 exact release permitted by its `espressif/usb_device_uac` `1.2.0` dependency.
 Keeping both versions exact prevents a future TinyUSB upload from silently
-changing USB descriptors or P4 PHY behavior.
+changing USB descriptors or P4 PHY behavior. The UAC component dependency is
+conditional on the top-level `USB_DEVICE_UAC_COMPONENT` CMake option. Normal
+builds leave it enabled; the CI vendor-only command disables both that option
+and `CONFIG_UAC_AUDIO_ENABLE`, so it does not compile a component whose
+descriptor types are disabled in the project TinyUSB configuration. The CMake
+option is used because Kconfig-based manifest conditions require ESP-IDF 6.0
+and this repository also validates ESP-IDF 5.5; see the Component Manager's
+[Kconfig condition documentation](https://docs.espressif.com/projects/idf-component-manager/en/latest/reference/manifest_file.html#kconfig-options).
 
 ## Product-local or example-local components
 

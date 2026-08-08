@@ -86,7 +86,8 @@ jobs:
               printf '%s\n' "$SELECTED_PROJECTS" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
               echo
               echo "Each selected project builds with ESP-IDF v5.5.5 and v6.0.2."
-              echo "The USB extend-screen project also builds its vendor-only configuration."
+              echo "The Brookesia Phone project builds explicit 3.4C and 4C display configurations."
+              echo "The USB extend-screen project builds its default and vendor-only configurations."
             } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No ESP-IDF example build was selected." >> "$GITHUB_STEP_SUMMARY"

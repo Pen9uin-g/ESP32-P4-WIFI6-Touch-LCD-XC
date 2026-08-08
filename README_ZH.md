@@ -115,7 +115,7 @@ idf.py -p PORT flash monitor
 | 范围 | 当前覆盖 |
 | --- | --- |
 | 仓库自检 | 文档、工程结构与一方 Arduino 示例目录 |
-| ESP-IDF | 12 个一方工程 × ESP-IDF `v5.5.5`/`v6.0.2`，再加 USB vendor-only 配置；完整路由共 26 个任务 |
+| ESP-IDF | 12 个一方工程 × ESP-IDF `v5.5.5`/`v6.0.2`，并覆盖 Brookesia 3.4C/4C 与 USB vendor-only；完整路由共 28 个任务 |
 | Arduino | 5 个一方示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置 |
 
 每个 Pull Request 都会得到可见的策略、ESP-IDF 路由和 Arduino 路由结论。纯文档
