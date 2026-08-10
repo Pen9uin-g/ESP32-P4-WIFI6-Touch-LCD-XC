@@ -8,15 +8,13 @@
   </p>
   <p>
     <a href="README_ZH.md">中文</a> ·
-    <a href="https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-3.4c.htm">🌐 Product Page</a> ·
+    <a href="https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-3.4c.htm">🌐 Product Family</a> ·
     <a href="https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-XC">📚 Product Documentation</a> ·
     <a href="docs/FIRMWARE.md">📦 Firmware Source</a> ·
     <a href="examples/esp-idf/">🧩 ESP-IDF Examples</a> ·
     <a href="examples/arduino/">🔧 Arduino Examples</a>
   </p>
-  <a href="https://www.waveshare.com/esp32-p4-wifi6-touch-lcd-3.4c.htm">
-    <img src="assets/ESP32-P4-WIFI6-Touch-LCD-XC.jpg" alt="Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C and ESP32-P4-WIFI6-Touch-LCD-4C" width="640">
-  </a>
+  <img src="assets/ESP32-P4-WIFI6-Touch-LCD-XC.jpg" alt="Waveshare ESP32-P4-WIFI6-Touch-LCD-3.4C and ESP32-P4-WIFI6-Touch-LCD-4C" width="640">
 </div>
 
 ---
@@ -126,7 +124,7 @@ platform guidance.
 | Surface | Current coverage |
 | --- | --- |
 | Repository self-check | Documentation, project structure, and first-party sketch layout |
-| ESP-IDF | 12 first-party projects × ESP-IDF `v5.5.5`/`v6.0.2`, plus Brookesia 3.4C/4C and USB vendor-only coverage: 28 jobs on a complete route |
+| ESP-IDF | 12 first-party projects × ESP-IDF `v5.5.5`/`v6.0.2`: 01–06 each build one shared non-display configuration per ESP-IDF line (12 jobs), 07–11 build both 3.4C and 4C displays (20 jobs), and USB builds both displays with default and vendor-only configurations (8 jobs); 40 jobs on a complete route |
 | Arduino | 5 first-party sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays |
 
 Every pull request gets visible policy, ESP-IDF-routing, and Arduino-routing

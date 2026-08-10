@@ -46,14 +46,32 @@ DEFAULT_CONFIG = {
     "pair_exempt_patterns": [],
     "language_link_exempt_patterns": [],
     "docs_only_allowed_patterns": [],
+    "homepage_pairs": [],
 }
 VALID_CATEGORIES = FIRST_PARTY | UPSTREAM | {"unknown"}
 QUICK_LINK_ICONS = "🌐📚📦🚀🧩🔧"
+QUICK_LINK_KEYS = {
+    "🌐": "product", "📚": "documentation", "📦": "firmware",
+    "🚀": "quick_start", "🧩": "esp_idf", "🔧": "arduino",
+}
+HOMEPAGE_COMPONENTS = {
+    "centered_header", "html_h1", "subtitle", "badges", "language_switch",
+    "quick_links", "hero_image", "separator", "h2",
+}
+HOMEPAGE_PROFILES = {"auto", "single-product", "multi-product-hub"}
+BADGE_KEYS = {"build", "release", "license"}
 H2_ICON_RE = re.compile(r"^##\s+([^\s]+)")
 LOCAL_PATH_RE = re.compile(r"(?:\[[^\]]*\]\(|!\[[^\]]*\]\(|href=[\"']|src=[\"'])([^)\"']+)", re.IGNORECASE)
 WINDOWS_PATH_RE = re.compile(r"(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/]|\\\\[A-Za-z0-9_.-]+[\\/])")
 SERIAL_RE = re.compile(r"\bCOM\d+\b", re.IGNORECASE)
 TOKEN_RE = re.compile(r"\b(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,})\b")
+TOOL_PROVENANCE_RE = re.compile(
+    r"\b(?:generated|written|created|authored|produced|assisted|edited|reviewed)\s+"
+    r"(?:by|with|using)\s+(?:OpenAI|ChatGPT|Codex|GPT-\d+(?:\.\d+)?(?:-[A-Za-z0-9]+)?|Claude(?:\s+\d+(?:\.\d+)?)?|Gemini(?:\s+\d+(?:\.\d+)?)?|Copilot|Cursor)\b"
+    r"|\b(?:OpenAI|ChatGPT|Codex|GPT-\d+(?:\.\d+)?(?:-[A-Za-z0-9]+)?|Claude(?:\s+\d+(?:\.\d+)?)?|Gemini(?:\s+\d+(?:\.\d+)?)?|Copilot|Cursor)\s+"
+    r"(?:generated|written|created|authored|produced|assisted|edited|reviewed)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -105,6 +123,35 @@ def load_config(path: Path | None) -> dict:
                     raise ValueError("invalid classification rule")
                 rules.append(rule)
             config[key] = rules + config[key]
+        elif key == "homepage_pairs":
+            if not isinstance(value, list):
+                raise ValueError("homepage_pairs must be a list")
+            pairs = []
+            required_keys = {
+                "english", "chinese", "profile", "required_components",
+                "required_quick_links", "required_badges", "required_h2_icons",
+                "h3_emoji_allow_patterns",
+            }
+            for pair in value:
+                if not isinstance(pair, dict) or set(pair) != required_keys:
+                    raise ValueError("each homepage pair must define all homepage policy fields")
+                if not isinstance(pair["english"], str) or not isinstance(pair["chinese"], str):
+                    raise ValueError("homepage pair paths must be strings")
+                if pair["profile"] not in HOMEPAGE_PROFILES:
+                    raise ValueError("invalid homepage profile")
+                for list_key, allowed in (
+                    ("required_components", HOMEPAGE_COMPONENTS),
+                    ("required_quick_links", set(QUICK_LINK_KEYS.values())),
+                    ("required_badges", BADGE_KEYS),
+                ):
+                    items = pair[list_key]
+                    if not isinstance(items, list) or not all(isinstance(item, str) and item in allowed for item in items):
+                        raise ValueError(f"invalid {list_key} in homepage pair")
+                for list_key in ("required_h2_icons", "h3_emoji_allow_patterns"):
+                    if not isinstance(pair[list_key], list) or not all(isinstance(item, str) and item for item in pair[list_key]):
+                        raise ValueError(f"invalid {list_key} in homepage pair")
+                pairs.append(pair)
+            config[key] = pairs
         else:
             if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
                 raise ValueError(f"{key} must be a list of strings")
@@ -323,6 +370,38 @@ def quick_icons(text: str) -> list[str]:
     return re.findall(f"[{QUICK_LINK_ICONS}]", header)
 
 
+def homepage_header(text: str) -> str:
+    return text.split("\n---", 1)[0]
+
+
+def quick_link_keys(text: str) -> list[str]:
+    links = re.findall(
+        r'<a\s+href=["\'][^"\']+["\'][^>]*>(.*?)</a>',
+        homepage_header(text),
+        re.IGNORECASE | re.DOTALL,
+    )
+    keys: list[str] = []
+    for label in links:
+        icons = [icon for icon in QUICK_LINK_KEYS if icon in label]
+        if len(icons) == 1:
+            keys.append(QUICK_LINK_KEYS[icons[0]])
+    return keys
+
+
+def badge_keys(text: str) -> list[str]:
+    keys: list[str] = []
+    pattern = r'<a\s+href=["\']([^"\']+)["\'][^>]*>\s*<img\s+[^>]*src=["\']([^"\']+)["\']'
+    for match in re.finditer(pattern, homepage_header(text), re.IGNORECASE):
+        href, source = (value.lower() for value in match.groups())
+        if "license" in href or "license" in source:
+            keys.append("license")
+        elif "release" in href or "release" in source:
+            keys.append("release")
+        elif "actions/workflows" in href or "badge" in source:
+            keys.append("build")
+    return keys
+
+
 def h2_icons(text: str) -> list[str]:
     icons: list[str] = []
     for line in text.splitlines():
@@ -334,24 +413,61 @@ def h2_icons(text: str) -> list[str]:
     return icons
 
 
-def check_homepage(root: Path) -> list[Finding]:
+def check_homepage_components(root: Path, path: str, counterpart: str, text: str, policy: dict) -> list[Finding]:
     findings: list[Finding] = []
-    english = root / "README.md"
-    chinese = root / "README_ZH.md"
-    if not english.is_file() or not chinese.is_file():
-        return findings
-    english_text = english.read_text(encoding="utf-8")
-    chinese_text = chinese.read_text(encoding="utf-8")
-    if quick_icons(english_text) != quick_icons(chinese_text):
-        findings.append(Finding(
-            "error", "HOMEPAGE_QUICK_LINK_ASYMMETRY", "README.md",
-            f"README.md and README_ZH.md quick-link icons differ: {quick_icons(english_text)} != {quick_icons(chinese_text)}",
-        ))
-    if h2_icons(english_text) != h2_icons(chinese_text):
-        findings.append(Finding(
-            "error", "HOMEPAGE_H2_ASYMMETRY", "README.md",
-            f"README.md and README_ZH.md primary-section icons differ: {h2_icons(english_text)} != {h2_icons(chinese_text)}",
-        ))
+    header = homepage_header(text)
+    checks = {
+        "centered_header": bool(re.search(r'^<div\s+align=["\']center["\']>', header)),
+        "html_h1": bool(re.search(r'^\s*<h1>[^<]+</h1>', header, re.MULTILINE)),
+        "subtitle": bool(re.search(r'^\s*<p><strong>[^<]+</strong></p>', header, re.MULTILINE)),
+        "badges": bool(badge_keys(text)),
+        "language_switch": counterpart in {target for target, _, _ in local_links(root, path, header)},
+        "quick_links": bool(quick_link_keys(text)),
+        "hero_image": bool(re.search(r'<img\s+[^>]*src=["\'](?!https?://)[^"\']+["\'][^>]*\balt=["\'][^"\']+["\']', header, re.IGNORECASE)),
+        "separator": "</div>\n\n---" in text,
+        "h2": bool(h2_icons(text)),
+    }
+    for component in policy["required_components"]:
+        if not checks[component]:
+            findings.append(Finding("error", "HOMEPAGE_COMPONENT_MISSING", path, f"required homepage component is missing: {component}"))
+
+    actual_links = quick_link_keys(text)
+    required_links = policy["required_quick_links"]
+    missing_links = [key for key in required_links if key not in actual_links]
+    if missing_links:
+        findings.append(Finding("error", "HOMEPAGE_QUICK_LINK_MISSING", path, f"missing required quick links: {missing_links}"))
+    elif actual_links != required_links:
+        findings.append(Finding("error", "HOMEPAGE_QUICK_LINK_ORDER", path, f"quick links must match configured semantic order: {required_links}"))
+
+    if badge_keys(text) != policy["required_badges"]:
+        findings.append(Finding("error", "HOMEPAGE_BADGE_MISMATCH", path, f"badges must match configured roles: {policy['required_badges']}"))
+    required_h2 = [icon[0] for icon in policy["required_h2_icons"]]
+    if h2_icons(text) != required_h2:
+        findings.append(Finding("error", "HOMEPAGE_H2_REQUIREMENT", path, f"H2 icons must match configured order: {policy['required_h2_icons']}"))
+    return findings
+
+
+def check_homepage(root: Path, config: dict | None = None) -> list[Finding]:
+    findings: list[Finding] = []
+    pairs = config["homepage_pairs"] if config and config["homepage_pairs"] else [{
+        "english": "README.md", "chinese": "README_ZH.md", "required_components": [],
+        "required_quick_links": [], "required_badges": [], "required_h2_icons": [],
+    }]
+    for policy in pairs:
+        english_path, chinese_path = policy["english"], policy["chinese"]
+        english, chinese = root / english_path, root / chinese_path
+        if not english.is_file() or not chinese.is_file():
+            findings.append(Finding("error", "HOMEPAGE_PAIR_MISSING", english_path, f"configured homepage pair is missing: {english_path}, {chinese_path}"))
+            continue
+        english_text = english.read_text(encoding="utf-8")
+        chinese_text = chinese.read_text(encoding="utf-8")
+        if quick_icons(english_text) != quick_icons(chinese_text):
+            findings.append(Finding("error", "HOMEPAGE_QUICK_LINK_ASYMMETRY", english_path, f"{english_path} and {chinese_path} quick-link icons differ: {quick_icons(english_text)} != {quick_icons(chinese_text)}"))
+        if h2_icons(english_text) != h2_icons(chinese_text):
+            findings.append(Finding("error", "HOMEPAGE_H2_ASYMMETRY", english_path, f"{english_path} and {chinese_path} primary-section icons differ: {h2_icons(english_text)} != {h2_icons(chinese_text)}"))
+        if config and config["homepage_pairs"]:
+            findings.extend(check_homepage_components(root, english_path, chinese_path, english_text, policy))
+            findings.extend(check_homepage_components(root, chinese_path, english_path, chinese_text, policy))
     return findings
 
 
@@ -361,6 +477,7 @@ def check_public_text(path: str, text: str) -> list[Finding]:
         (WINDOWS_PATH_RE, "LOCAL_ABSOLUTE_PATH", "public Markdown contains a machine-specific absolute path"),
         (SERIAL_RE, "ACTUAL_SERIAL_PORT", "public Markdown contains a concrete serial-port identifier"),
         (TOKEN_RE, "CREDENTIAL_OR_TOKEN", "public Markdown contains a credential-shaped token"),
+        (TOOL_PROVENANCE_RE, "TOOL_OR_MODEL_PROVENANCE", "public Markdown contains tool or model authorship provenance"),
     ):
         if pattern.search(text):
             findings.append(Finding("error", code, path, message))
@@ -450,7 +567,7 @@ def main() -> int:
         elif category == "unknown":
             findings.append(Finding("warning", "MARKDOWN_OWNERSHIP_UNKNOWN", path, "Markdown ownership is not classified"))
 
-    findings.extend(check_homepage(root))
+    findings.extend(check_homepage(root, config))
 
     print(f"Markdown audit: {root.name}")
     print(f"Scope: {selected_scope}, selected_markdown={len(selected_markdown)}, docs_only={args.expect_docs_only}")
