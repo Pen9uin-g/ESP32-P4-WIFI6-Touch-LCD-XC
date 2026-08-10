@@ -13,6 +13,7 @@
   ],
   "global_build_patterns": [
     ".github/scripts/ci_change_router.py",
+    ".github/scripts/package_build_artifact.py",
     ".github/scripts/discover_arduino_sketches.py",
     ".github/scripts/discover_esp_idf_projects.py"
   ]

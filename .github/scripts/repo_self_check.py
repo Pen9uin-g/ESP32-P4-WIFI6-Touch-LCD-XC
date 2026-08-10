@@ -24,11 +24,13 @@ REQUIRED_FILES = (
     Path("examples/arduino/README.md"),
     Path(".github/scripts/audit_markdown.py"),
     Path(".github/scripts/ci_change_router.py"),
+    Path(".github/scripts/package_build_artifact.py"),
     Path(".github/scripts/ci-routing-audit-config.json"),
     Path(".github/scripts/markdown-audit-config.json"),
     Path(".github/scripts/repo_self_check.py"),
     Path(".github/tests/test_audit_markdown.py"),
     Path(".github/tests/test_ci_change_router.py"),
+    Path(".github/tests/test_package_build_artifact.py"),
     Path(".github/ISSUE_TEMPLATE/bug_report.md"),
     Path(".github/ISSUE_TEMPLATE/bug_report_ZH.md"),
     Path(".github/pull_request_template.md"),
@@ -56,6 +58,7 @@ REQUIRED_FILES = (
     Path("examples/esp-idf/10_mp4_player/README_ZH.md"),
     Path("examples/esp-idf/11_esp_brookesia_phone/README_ZH.md"),
     Path("examples/esp-idf/11_esp_brookesia_phone/sdkconfig.ci.4c"),
+    Path("examples/esp-idf/11_esp_brookesia_phone/sdkconfig.ci.3_4c"),
     Path("examples/esp-idf/12_usb_extend_screen/sdkconfig.ci.vendor-only"),
 )
 

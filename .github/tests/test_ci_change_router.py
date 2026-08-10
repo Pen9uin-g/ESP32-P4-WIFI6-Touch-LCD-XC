@@ -15,6 +15,7 @@ SCRIPT = ROOT / ".github" / "scripts" / "ci_change_router.py"
 IDF_WORKFLOW = ROOT / ".github" / "workflows" / "esp-idf-projects.yml"
 ARDUINO_WORKFLOW = ROOT / ".github" / "workflows" / "arduino-projects.yml"
 POLICY_WORKFLOW = ROOT / ".github" / "workflows" / "documentation.yml"
+ROUTING_AUDIT_CONFIG = ROOT / ".github" / "scripts" / "ci-routing-audit-config.json"
 SPEC = importlib.util.spec_from_file_location("ci_change_router", SCRIPT)
 assert SPEC and SPEC.loader
 router = importlib.util.module_from_spec(SPEC)
@@ -37,16 +38,22 @@ class RouterTests(unittest.TestCase):
     def test_inventory_and_complete_matrix_sizes(self) -> None:
         self.assertEqual(12, len(self.idf))
         self.assertEqual(5, len(self.arduino))
-        self.assertEqual(28, len(router.idf_matrix(sorted(self.idf))["include"]))
+        matrix = router.idf_matrix(sorted(self.idf))["include"]
+        self.assertEqual(40, len(matrix))
         self.assertEqual(10, len(router.arduino_matrix(sorted(self.arduino))["include"]))
+        self.assertEqual(40, len({entry["artifact_key"] for entry in matrix}))
+        self.assertEqual({"3.4C", "4C"}, {entry["variant"] for entry in matrix if entry["project"] in router.DISPLAY_PROJECTS})
+        self.assertEqual({"3_4c", "4c"}, {entry["variant_id"] for entry in matrix if entry["project"] in router.DISPLAY_PROJECTS})
+        self.assertTrue(all(entry["artifact_key"].startswith("xc-") for entry in matrix))
+        self.assertTrue(all("-esp-idf-" in entry["artifact_key"] for entry in matrix))
 
-    def test_phone_matrix_has_34c_and_4c_configurations(self) -> None:
+    def test_phone_matrix_has_34c_and_4c_variants(self) -> None:
         entries = router.idf_matrix([router.PHONE_PROJECT])["include"]
         self.assertEqual(4, len(entries))
-        display_34c = [entry for entry in entries if entry["configuration"] == "3.4C"]
-        display_4c = [entry for entry in entries if entry["configuration"] == "4C"]
+        display_34c = [entry for entry in entries if entry["variant"] == "3.4C"]
+        display_4c = [entry for entry in entries if entry["variant"] == "4C"]
         self.assertEqual(2, len(display_34c))
-        self.assertTrue(all(entry["command"] == "idf.py build" for entry in display_34c))
+        self.assertTrue(all("sdkconfig.ci.3_4c" in entry["command"] for entry in display_34c))
         self.assertEqual(2, len(display_4c))
         self.assertTrue(
             all("sdkconfig.defaults;sdkconfig.ci.4c" in entry["command"] for entry in display_4c)
@@ -67,13 +74,23 @@ class RouterTests(unittest.TestCase):
 
     def test_usb_vendor_only_matrix_is_explicit(self) -> None:
         entries = router.idf_matrix([router.USB_PROJECT])["include"]
-        self.assertEqual(4, len(entries))
+        self.assertEqual(8, len(entries))
         vendor = [entry for entry in entries if entry["configuration"] == "vendor-only"]
-        self.assertEqual(2, len(vendor))
+        self.assertEqual(4, len(vendor))
         self.assertTrue(all("sdkconfig.ci.vendor-only" in entry["command"] for entry in vendor))
         self.assertTrue(
             all("USB_DEVICE_UAC_COMPONENT=OFF" in entry["command"] for entry in vendor)
         )
+        self.assertEqual({"3.4C", "4C"}, {entry["variant"] for entry in vendor})
+        self.assertTrue(all("sdkconfig.defaults.esp32p4" in entry["command"] for entry in entries))
+
+    def test_display_routes_expand_to_all_required_variants(self) -> None:
+        project = "examples/esp-idf/08_lvgl_demo_v9"
+        route = router.route_changes([router.Change("M", (project + "/main/main.c",))], self.idf, self.arduino)
+        entries = router.idf_matrix(route["idf_projects"])["include"]
+        self.assertEqual(4, len(entries))
+        self.assertEqual({"3.4C", "4C"}, {entry["variant"] for entry in entries})
+        self.assertTrue(all((ROOT / project / ("sdkconfig.ci.3_4c" if entry["variant"] == "3.4C" else "sdkconfig.ci.4c")).is_file() for entry in entries))
 
     def test_usb_vendor_only_component_dependency_contract(self) -> None:
         project = ROOT / router.USB_PROJECT
@@ -170,6 +187,12 @@ class RouterTests(unittest.TestCase):
         )
         self.assertEqual(sorted(self.idf), router_route["idf_projects"])
         self.assertEqual(sorted(self.arduino), router_route["arduino_sketches"])
+
+        audit_config = json.loads(ROUTING_AUDIT_CONFIG.read_text(encoding="utf-8"))
+        self.assertIn(
+            ".github/scripts/package_build_artifact.py",
+            audit_config["global_build_patterns"],
+        )
 
     def test_rename_and_deletion_route_using_old_paths(self) -> None:
         project = "examples/esp-idf/03_i2c_tools"
@@ -278,7 +301,7 @@ class RouterTests(unittest.TestCase):
 
         all_projects = self.run_router_cli("--all")
         self.assertEqual(0, all_projects.returncode, all_projects.stderr)
-        self.assertEqual(28, len(json.loads(all_projects.stdout)["idf_matrix"]["include"]))
+        self.assertEqual(40, len(json.loads(all_projects.stdout)["idf_matrix"]["include"]))
 
     def test_esp_idf_workflow_consumes_router_cli_outputs(self) -> None:
         workflow = IDF_WORKFLOW.read_text(encoding="utf-8")
@@ -287,6 +310,9 @@ class RouterTests(unittest.TestCase):
         self.assertIn("matrix: ${{ steps.route.outputs.idf_matrix }}", workflow)
         self.assertIn("if: needs.discover.outputs.has_projects == 'true'", workflow)
         self.assertIn("command: ${{ matrix.command }}", workflow)
+        self.assertIn("package_build_artifact.py esp-idf", workflow)
+        self.assertIn("actions/upload-artifact@v7", workflow)
+        self.assertIn("retention-days: ${{ github.event_name == 'pull_request' && 14 || 30 }}", workflow)
 
     def test_arduino_workflow_consumes_router_cli_outputs(self) -> None:
         workflow = ARDUINO_WORKFLOW.read_text(encoding="utf-8")
@@ -295,6 +321,8 @@ class RouterTests(unittest.TestCase):
         self.assertIn("matrix: ${{ steps.route.outputs.arduino_matrix }}", workflow)
         self.assertIn("has_sketches: ${{ steps.route.outputs.has_arduino }}", workflow)
         self.assertIn("if: needs.discover.outputs.has_sketches == 'true'", workflow)
+        self.assertIn("package_build_artifact.py arduino", workflow)
+        self.assertIn("actions/upload-artifact@v7", workflow)
 
     def test_policy_workflow_runs_the_complete_router_and_markdown_gates(self) -> None:
         workflow = POLICY_WORKFLOW.read_text(encoding="utf-8")

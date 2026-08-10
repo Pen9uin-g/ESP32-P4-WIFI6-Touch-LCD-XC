@@ -23,22 +23,26 @@ ARDUINO_ROOT = Path("examples/arduino/examples")
 ARDUINO_LIBRARY_ROOT = "examples/arduino/libraries"
 DEFAULT_IDF_VERSIONS = ("v5.5.5", "v6.0.2")
 SCREEN_VARIANTS = (
-    {"screen": "3.4C", "screen_define": "SCREEN_3INCH_4_DSI"},
-    {"screen": "4C", "screen_define": "SCREEN_4INCH_DSI"},
+    {"screen": "3.4C", "variant_id": "3_4c", "screen_define": "SCREEN_3INCH_4_DSI", "resolution": "800x800"},
+    {"screen": "4C", "variant_id": "4c", "screen_define": "SCREEN_4INCH_DSI", "resolution": "720x720"},
 )
 USB_PROJECT = "examples/esp-idf/12_usb_extend_screen"
 PHONE_PROJECT = "examples/esp-idf/11_esp_brookesia_phone"
-PHONE_4C_COMMAND = (
-    'idf.py -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.ci.4c" build'
-)
-USB_VENDOR_ONLY_COMMAND = (
-    'idf.py -D "USB_DEVICE_UAC_COMPONENT=OFF" '
-    '-D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;'
-    'sdkconfig.defaults.esp32p4;sdkconfig.ci.vendor-only" build'
-)
+DISPLAY_PROJECTS = {
+    f"examples/esp-idf/{name}"
+    for name in (
+        "07_Displaycolorbar", "08_lvgl_demo_v9", "09_video_lcd_display",
+        "10_mp4_player", "11_esp_brookesia_phone", "12_usb_extend_screen",
+    )
+}
+DISPLAY_BASE_DEFAULTS = {
+    "examples/esp-idf/07_Displaycolorbar": ("sdkconfig.defaults", "sdkconfig.defaults.esp32p4"),
+    USB_PROJECT: ("sdkconfig.defaults", "sdkconfig.defaults.esp32p4"),
+}
 
 GLOBAL_BOTH_PATHS = {
     ".github/scripts/ci_change_router.py",
+    ".github/scripts/package_build_artifact.py",
 }
 # Keep the legacy classifier paths as routing inputs so their deletion or a
 # later rename still selects the matrix whose behavior changed.
@@ -321,23 +325,43 @@ def normalize_selection(value: str, known_items: set[str], kind: str) -> list[st
 def idf_matrix(projects: list[str]) -> dict[str, list[dict[str, str]]]:
     include: list[dict[str, str]] = []
     for project in projects:
-        if project == PHONE_PROJECT:
-            configurations = [("3.4C", "idf.py build"), ("4C", PHONE_4C_COMMAND)]
-        else:
-            configurations = [("default", "idf.py build")]
-        if project == USB_PROJECT:
-            configurations.append(("vendor-only", USB_VENDOR_ONLY_COMMAND))
-        for configuration, command in configurations:
-            for idf_version in DEFAULT_IDF_VERSIONS:
-                include.append(
-                    {
-                        "project": project,
-                        "project_name": Path(project).name,
-                        "idf_version": idf_version,
-                        "configuration": configuration,
-                        "command": command,
-                    }
-                )
+        variants = SCREEN_VARIANTS if project in DISPLAY_PROJECTS else ({"screen": "shared", "variant_id": "shared", "resolution": "n/a"},)
+        configurations = ("default", "vendor-only") if project == USB_PROJECT else ("default",)
+        for variant in variants:
+            for configuration in configurations:
+                defaults = list(DISPLAY_BASE_DEFAULTS.get(project, ("sdkconfig.defaults",)))
+                if project in DISPLAY_PROJECTS:
+                    # Project 11 already records 3.4C in its default file, but an
+                    # explicit overlay keeps the matrix contract uniform.
+                    defaults.append("sdkconfig.ci.3_4c" if variant["screen"] == "3.4C" else "sdkconfig.ci.4c")
+                vendor_only = configuration == "vendor-only"
+                if vendor_only:
+                    defaults.append("sdkconfig.ci.vendor-only")
+                command_parts = []
+                if vendor_only:
+                    command_parts.append('-D "USB_DEVICE_UAC_COMPONENT=OFF"')
+                command_parts.append('-D "SDKCONFIG_DEFAULTS=' + ";".join(defaults) + '"')
+                command_parts.append("build")
+                command = "idf.py " + " ".join(command_parts)
+                for idf_version in DEFAULT_IDF_VERSIONS:
+                    artifact_key = "-".join((
+                        "xc", variant["variant_id"], "esp-idf",
+                        "v" + idf_version.lstrip("v").replace(".", "-"),
+                        Path(project).name, configuration,
+                    ))
+                    include.append(
+                        {
+                            "project": project,
+                            "project_name": Path(project).name,
+                            "idf_version": idf_version,
+                            "configuration": configuration,
+                            "variant": variant["screen"],
+                            "variant_id": variant["variant_id"],
+                            "resolution": variant["resolution"],
+                            "artifact_key": artifact_key,
+                            "command": command,
+                        }
+                    )
     return {"include": include}
 
 
@@ -348,6 +372,12 @@ def arduino_matrix(sketches: list[str]) -> dict[str, list[dict[str, str]]]:
                 "sketch": sketch,
                 "sketch_name": Path(sketch).name,
                 **variant,
+                "configuration": "default",
+                "variant": variant["screen"],
+                "artifact_key": "-".join((
+                    "xc", variant["variant_id"], "arduino", "3-3-11",
+                    Path(sketch).name, "default",
+                )),
             }
             for sketch in sketches
             for variant in SCREEN_VARIANTS

@@ -135,3 +135,32 @@ jobs:
             --build-property "compiler.c.extra_flags=-I$library_root" \
             --build-property "compiler.cpp.extra_flags=-I$library_root -DCURRENT_SCREEN=$SCREEN_DEFINE" \
             "$SKETCH_PATH"
+
+      - name: Package flashable example artifact
+        id: package
+        shell: bash
+        env:
+          ARTIFACT_KEY: ${{ matrix.artifact_key }}
+        run: |
+          set -euo pipefail
+          git_sha="$(git rev-parse HEAD)"
+          build_path="$RUNNER_TEMP/arduino-build/${{ matrix.sketch_name }}/${{ matrix.screen }}"
+          output="$RUNNER_TEMP/example-artifacts/$ARTIFACT_KEY"
+          python .github/scripts/package_build_artifact.py arduino \
+            --build-dir "$build_path" --output-dir "$output" \
+            --product-label "ESP32-P4-WIFI6-Touch-LCD-XC" --variant "${{ matrix.variant }}" \
+            --variant-id "${{ matrix.variant_id }}" \
+            --resolution "${{ matrix.resolution }}" --configuration "${{ matrix.configuration }}" \
+            --framework-version "$ARDUINO_CORE_VERSION" --target esp32p4 \
+            --project "${{ matrix.sketch }}" --sketch "${{ matrix.sketch_name }}" \
+            --fqbn "$ARDUINO_FQBN" --git-sha "$git_sha"
+          echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
+          echo "path=$output" >> "$GITHUB_OUTPUT"
+
+      - name: Upload flashable example artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: ${{ steps.package.outputs.path }}
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 14 || 30 }}

@@ -1,0 +1,3 @@
+# CI-only explicit 3.4C display selection (matches the default configuration).
+CONFIG_BSP_LCD_TYPE_800_800_3_4_INCH=y
+# CONFIG_BSP_LCD_TYPE_720_720_4_INCH is not set

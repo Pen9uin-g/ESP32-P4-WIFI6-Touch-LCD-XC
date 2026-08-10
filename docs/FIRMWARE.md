@@ -18,8 +18,9 @@ surface rather than a routine example.
 - Do not change, repackage, or regenerate firmware source, binaries, or delivery
   archives as part of documentation or example-CI maintenance without an explicit
   firmware scope.
-- Example-CI build outputs, when later requested, must remain separate from reviewed
-  factory or delivery firmware.
+- Downloadable example-CI artifacts are generated after successful example builds.
+  They remain separate from reviewed factory or delivery firmware; Releases are
+  manual/deferred rather than an automated artifact publication path.
 
 This checkout currently has no positively identified checked-in factory `.bin` or
 delivery `.zip` artifact under `firmware/`. Source and build instructions for a

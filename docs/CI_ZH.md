@@ -74,11 +74,11 @@ ESP-IDF 工程就被当作另一个示例，也不会凭空获得未经验证的
 | Target | `esp32p4` |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
 
-基础完整路由包含 24 个任务：12 个工程乘以两个 ESP-IDF 版本。
-`11_esp_brookesia_phone` 除默认 3.4C 配置外，还会构建 4C 显示配置；
-`12_usb_extend_screen` 还会使用关闭 HID 触控和 UAC 音频的 CI 专用
-`vendor-only` 配置，并在依赖解析阶段省略托管 UAC 组件。两条可选路径在两个 IDF
-版本上共增加 4 个任务，因此完整路由包含 28 个 ESP-IDF 构建任务。
+完整路由包含 40 个任务：01–06 工程使用共享/default 配置（6 × 2）；07–11 显示
+工程显式构建 3.4C（800×800）和 4C（720×720）两种变体（5 × 2 × 2）；
+`12_usb_extend_screen` 则为两种显示变体同时构建 `default` 和 CI 专用
+`vendor-only` 配置（2 × 2 × 2）。vendor-only 与屏幕选择正交，同时关闭 HID 触控和
+UAC 音频，并在依赖解析阶段省略托管 UAC 组件。
 
 手动运行可以使用 `project=all`、工程名（如 `02_HelloWorld`）或完整工程路径。
 
@@ -96,3 +96,16 @@ ESP-IDF 工程就被当作另一个示例，也不会凭空获得未经验证的
 
 完整路由为 5 个示例乘以 2 个显示变体，共 10 个构建任务。手动运行可以使用
 `sketch=all`、示例名或完整示例路径。
+
+## 可下载示例构建产物
+
+产品构建成功后，Actions 会上传一个以工程/示例、显示变体、配置、框架和精确提交
+短 SHA 命名的构建产物。可在工作流运行的 **Artifacts** 区域下载。产物仅含一方示例
+生成输出：`manifest.json`、`SHA256SUMS`、`flash.sh`、`flash.bat`、由框架烧录计划
+引用且保持安全相对路径的 `bin/` 文件，以及存在时的 ELF/map/sdkconfig 调试文件。
+Arduino 核生成 `merged.bin` 时也会保留该文件。
+
+manifest 会记录完整提交 SHA、目标、显示/分辨率、配置、框架、烧录设置和有序偏移。
+烧录辅助脚本需要端口参数，可选波特率参数，且不会擦除 Flash。它们是示例构建诊断
+产物，不代表硬件验证或工厂固件；Release 仍为手动/延后流程，单独维护的
+`firmware/` 交付面保持独立。

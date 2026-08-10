@@ -82,14 +82,13 @@ a direct child of `examples/esp-idf/`. Every selected project builds with:
 | Target | `esp32p4` |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
 
-The baseline complete route contains 24 jobs: 12 projects times two supported
-ESP-IDF releases. `11_esp_brookesia_phone` additionally builds its 4C display
-configuration alongside the default 3.4C configuration, and
-`12_usb_extend_screen` additionally builds the CI-only `vendor-only`
-configuration with HID touch and UAC audio disabled and the managed UAC
-component omitted during dependency resolution. These optional paths add four
-jobs across the two IDF releases, bringing a complete route to 28 ESP-IDF build
-jobs.
+The complete route contains 40 jobs: projects 01–06 use the shared/default
+configuration (6 × 2); display projects 07–11 build explicit 3.4C (800×800)
+and 4C (720×720) variants (5 × 2 × 2); and
+`12_usb_extend_screen` builds both display variants with both `default` and
+CI-only `vendor-only` configurations (2 × 2 × 2). Vendor-only keeps the screen
+choice orthogonal while disabling HID touch/UAC audio and omitting the managed
+UAC component during dependency resolution.
 
 Manual runs accept `project=all`, a directory name such as `02_HelloWorld`, or
 a full project path.
@@ -110,3 +109,20 @@ sketch builds for both displays:
 
 A complete route is 5 sketches times 2 display variants, or 10 build jobs.
 Manual runs accept `sketch=all`, a sketch name, or a full sketch path.
+
+## Downloadable example artifacts
+
+After a successful product build, Actions uploads one artifact named with its
+project/sketch, variant, configuration, framework and short exact SHA. Download
+it from the workflow run's **Artifacts** section. It contains only generated
+first-party example outputs: `manifest.json`, `SHA256SUMS`, `flash.sh`,
+`flash.bat`, safe-path `bin/` files referenced by the framework flash plan, and
+available ELF/map/sdkconfig debug files. Arduino packages also retain
+`merged.bin` when the core generated it.
+
+The manifest records the full commit SHA, target, display/resolution,
+configuration, framework, flash settings and ordered offsets. The flash helpers
+require a port and accept an optional baud rate; they do not erase flash.
+Artifacts are example-build diagnostics, not hardware validation or factory
+firmware. Releases remain manual/deferred, and the separately maintained
+`firmware/` delivery surface remains separate.
