@@ -197,8 +197,109 @@ def local_link_target(raw: str) -> str | None:
     return parsed.path
 
 
+def resolved_local_link(root: Path, path: str, raw: str) -> str | None:
+    target = local_link_target(raw)
+    if target is None:
+        return None
+    candidate = (root / Path(path).parent / Path(target)).resolve()
+    try:
+        return candidate.relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return None
+
+
+def local_links(root: Path, path: str, text: str) -> list[tuple[str, int, int]]:
+    """Return repository-relative local link targets with their text positions."""
+
+    links: list[tuple[str, int, int]] = []
+    for match in LOCAL_PATH_RE.finditer(text):
+        target = resolved_local_link(root, path, match.group(1))
+        if target is not None:
+            block = len(re.findall(r"\n[ \t]*\n", text[:match.start()]))
+            links.append((target, match.start(), block))
+    return links
+
+
+def language_link_exempt(path: str, counterpart: str, config: dict) -> bool:
+    patterns = config["language_link_exempt_patterns"]
+    return matches(path, patterns) or matches(counterpart, patterns)
+
+
+def check_reciprocal_language_links(root: Path, path: str, config: dict) -> list[Finding]:
+    """Require both members of a first-party companion pair to link near the top."""
+
+    counterpart = expected_companion(path)
+    if not (root / Path(counterpart)).is_file() or language_link_exempt(path, counterpart, config):
+        return []
+
+    findings: list[Finding] = []
+    for source, target in ((path, counterpart), (counterpart, path)):
+        text = read_text(root, source)
+        positions = [position for linked, position, _ in local_links(root, source, text) if linked == target]
+        if not positions:
+            findings.append(Finding(
+                "error", "BILINGUAL_NAVIGATION_MISSING", source,
+                f"page has no reciprocal language link to: {target}",
+            ))
+        elif min(positions) >= 1200:
+            findings.append(Finding(
+                "error", "BILINGUAL_NAVIGATION_NOT_NEAR_TOP", source,
+                f"reciprocal language link to {target} is not near the top",
+            ))
+    return findings
+
+
+def language_link_pair(target: str) -> tuple[str, str] | None:
+    counterpart = expected_companion(target)
+    if target.endswith("_ZH.md"):
+        return (counterpart, target)
+    return (target, counterpart)
+
+
+def check_wrong_language_links(
+    root: Path, path: str, text: str, config: dict | None = None
+) -> list[Finding]:
+    """Reject cross-page links when an existing same-language destination exists."""
+
+    chinese_page = path.endswith("_ZH.md")
+    links = local_links(root, path, text)
+    chooser_targets: dict[tuple[str, str, int], set[str]] = {}
+    for target, _, block in links:
+        if not target.lower().endswith(".md"):
+            continue
+        english, chinese = language_link_pair(target)
+        if (root / Path(english)).is_file() and (root / Path(chinese)).is_file():
+            chooser_targets.setdefault((english, chinese, block), set()).add(target)
+    chooser_pairs = {
+        pair for pair, targets in chooser_targets.items()
+        if {pair[0], pair[1]}.issubset(targets)
+    }
+
+    findings: list[Finding] = []
+    own_companion = expected_companion(path)
+    if config is not None and language_link_exempt(path, own_companion, config):
+        return findings
+    for target, _, block in links:
+        if target == own_companion or not target.lower().endswith(".md"):
+            continue
+        english, chinese = language_link_pair(target)
+        if not (root / Path(english)).is_file() or not (root / Path(chinese)).is_file():
+            continue
+        if (english, chinese, block) in chooser_pairs:
+            continue
+        wrong_target = english if chinese_page else chinese
+        if target == wrong_target:
+            expected = chinese if chinese_page else english
+            findings.append(Finding(
+                "error", "WRONG_LANGUAGE_INTERNAL_LINK", path,
+                f"use the same-language local target when it exists: {expected}",
+            ))
+    return findings
+
+
 def check_links(root: Path, path: str, text: str) -> list[Finding]:
     findings: list[Finding] = []
+    checked_targets: set[str] = set()
     for match in LOCAL_PATH_RE.finditer(text):
         raw = match.group(1)
         target = local_link_target(raw)
@@ -210,8 +311,10 @@ def check_links(root: Path, path: str, text: str) -> list[Finding]:
         except ValueError:
             findings.append(Finding("error", "RELATIVE_LINK_ESCAPE", path, f"local link escapes repository: {raw}"))
             continue
-        if not candidate.exists():
+        candidate_key = candidate.as_posix()
+        if not candidate.exists() and candidate_key not in checked_targets:
             findings.append(Finding("error", "RELATIVE_LINK_MISSING", path, f"local link target does not exist: {raw}"))
+        checked_targets.add(candidate_key)
     return findings
 
 
@@ -325,6 +428,7 @@ def main() -> int:
 
     selected_markdown = [path for path in paths if is_markdown(path) and (root / Path(path)).is_file()]
     classifications = {path: classify(path, config) for path in selected_markdown}
+    checked_language_pairs: set[tuple[str, str]] = set()
     for path in selected_markdown:
         category = classifications[path]
         if category in FIRST_PARTY and not matches(path, config["pair_exempt_patterns"]):
@@ -332,13 +436,16 @@ def main() -> int:
             if not (root / Path(counterpart)).is_file():
                 severity = "warning" if selected_scope == "all" else "error"
                 findings.append(Finding(severity, "BILINGUAL_PAIR_MISSING", path, f"first-party Markdown has no companion: {counterpart}"))
-            elif path.endswith("_ZH.md"):
-                text = read_text(root, path)
-                if not re.search(r"(?:English|英文|English Version|English version)", text[:1200], re.IGNORECASE):
-                    findings.append(Finding("warning", "BILINGUAL_NAVIGATION_MISSING", path, "Chinese page has no nearby English navigation entry"))
+            else:
+                pair = tuple(sorted((path, counterpart)))
+                if pair not in checked_language_pairs:
+                    findings.extend(check_reciprocal_language_links(root, path, config))
+                    checked_language_pairs.add(pair)
         if category in FIRST_PARTY:
             text = read_text(root, path)
             findings.extend(check_links(root, path, text))
+            if not language_link_exempt(path, expected_companion(path), config):
+                findings.extend(check_wrong_language_links(root, path, text, config))
             findings.extend(check_public_text(path, text))
         elif category == "unknown":
             findings.append(Finding("warning", "MARKDOWN_OWNERSHIP_UNKNOWN", path, "Markdown ownership is not classified"))

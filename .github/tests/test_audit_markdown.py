@@ -75,6 +75,72 @@ class MarkdownAuditTests(unittest.TestCase):
             [finding.code for finding in findings],
         )
 
+    def test_reciprocal_language_links_require_both_pages_near_the_top(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "GUIDE.md").write_text("[中文](GUIDE_ZH.md)", encoding="utf-8")
+            (root / "GUIDE_ZH.md").write_text("Guide", encoding="utf-8")
+            findings = audit.check_reciprocal_language_links(
+                root, "GUIDE.md", audit.load_config(None)
+            )
+        self.assertEqual(
+            ["BILINGUAL_NAVIGATION_MISSING"],
+            [finding.code for finding in findings],
+        )
+
+    def test_wrong_language_internal_links_require_existing_companions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for name in ("GUIDE.md", "GUIDE_ZH.md", "OTHER.md", "OTHER_ZH.md"):
+                (root / name).write_text("page", encoding="utf-8")
+            english = audit.check_wrong_language_links(root, "GUIDE.md", "[other](OTHER_ZH.md)")
+            chinese = audit.check_wrong_language_links(root, "GUIDE_ZH.md", "[other](OTHER.md)")
+        self.assertEqual(["WRONG_LANGUAGE_INTERNAL_LINK"], [finding.code for finding in english])
+        self.assertEqual(["WRONG_LANGUAGE_INTERNAL_LINK"], [finding.code for finding in chinese])
+
+    def test_bilingual_chooser_block_allows_both_language_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for name in ("GUIDE_ZH.md", "OTHER.md", "OTHER_ZH.md"):
+                (root / name).write_text("page", encoding="utf-8")
+            findings = audit.check_wrong_language_links(
+                root,
+                "GUIDE_ZH.md",
+                "[English](OTHER.md)\n[中文](OTHER_ZH.md)",
+            )
+        self.assertEqual([], findings)
+
+    def test_bilingual_links_separated_by_a_blank_line_are_not_one_chooser(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for name in ("GUIDE_ZH.md", "OTHER.md", "OTHER_ZH.md"):
+                (root / name).write_text("page", encoding="utf-8")
+            findings = audit.check_wrong_language_links(
+                root,
+                "GUIDE_ZH.md",
+                "[English](OTHER.md)\n\n[中文](OTHER_ZH.md)",
+            )
+        self.assertEqual(
+            ["WRONG_LANGUAGE_INTERNAL_LINK"],
+            [finding.code for finding in findings],
+        )
+
+    def test_language_link_exemption_suppresses_reciprocal_and_routing_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "GUIDE.md").write_text("[other](OTHER_ZH.md)", encoding="utf-8")
+            (root / "GUIDE_ZH.md").write_text("guide", encoding="utf-8")
+            (root / "OTHER.md").write_text("other", encoding="utf-8")
+            (root / "OTHER_ZH.md").write_text("其他", encoding="utf-8")
+            config = audit.load_config(None)
+            config["language_link_exempt_patterns"].append("GUIDE.md")
+            reciprocal = audit.check_reciprocal_language_links(root, "GUIDE.md", config)
+            routing = audit.check_wrong_language_links(
+                root, "GUIDE.md", (root / "GUIDE.md").read_text(encoding="utf-8"), config
+            )
+        self.assertEqual([], reciprocal)
+        self.assertEqual([], routing)
+
 
 if __name__ == "__main__":
     unittest.main()

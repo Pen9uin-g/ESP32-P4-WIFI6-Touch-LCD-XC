@@ -13,6 +13,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "scripts" / "ci_change_router.py"
 IDF_WORKFLOW = ROOT / ".github" / "workflows" / "esp-idf-projects.yml"
+ARDUINO_WORKFLOW = ROOT / ".github" / "workflows" / "arduino-projects.yml"
+POLICY_WORKFLOW = ROOT / ".github" / "workflows" / "documentation.yml"
 SPEC = importlib.util.spec_from_file_location("ci_change_router", SCRIPT)
 assert SPEC and SPEC.loader
 router = importlib.util.module_from_spec(SPEC)
@@ -285,6 +287,23 @@ class RouterTests(unittest.TestCase):
         self.assertIn("matrix: ${{ steps.route.outputs.idf_matrix }}", workflow)
         self.assertIn("if: needs.discover.outputs.has_projects == 'true'", workflow)
         self.assertIn("command: ${{ matrix.command }}", workflow)
+
+    def test_arduino_workflow_consumes_router_cli_outputs(self) -> None:
+        workflow = ARDUINO_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn('--manual-arduino "$MANUAL_SKETCH"', workflow)
+        self.assertIn("ci_change_router.py --all", workflow)
+        self.assertIn("matrix: ${{ steps.route.outputs.arduino_matrix }}", workflow)
+        self.assertIn("has_sketches: ${{ steps.route.outputs.has_arduino }}", workflow)
+        self.assertIn("if: needs.discover.outputs.has_sketches == 'true'", workflow)
+
+    def test_policy_workflow_runs_the_complete_router_and_markdown_gates(self) -> None:
+        workflow = POLICY_WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn('python -m unittest discover -s .github/tests -p "test_*.py"', workflow)
+        self.assertIn("python .github/scripts/repo_self_check.py", workflow)
+        self.assertIn("--strict-unknown", workflow)
+        self.assertIn("python .github/scripts/audit_markdown.py .", workflow)
+        self.assertIn('--base "${{ github.event.pull_request.base.sha }}"', workflow)
+        self.assertIn("--config .github/scripts/markdown-audit-config.json", workflow)
 
 
 if __name__ == "__main__":

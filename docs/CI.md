@@ -35,6 +35,11 @@ The self-check verifies required documentation and workflows, generated-output
 ignore rules, all 12 direct ESP-IDF projects, all 5 direct Arduino sketches,
 and the example index.
 
+For every first-party English/Chinese Markdown companion pair, the local policy
+gate requires reciprocal language links near the top of both pages. Internal
+links also stay in the reader's language when the destination companion exists;
+an explicit bilingual language chooser may link to both targets together.
+
 ## Complete change routing
 
 Both product workflows and the policy workflow use one classifier:
