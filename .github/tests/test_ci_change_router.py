@@ -59,6 +59,18 @@ class RouterTests(unittest.TestCase):
             all("sdkconfig.defaults;sdkconfig.ci.4c" in entry["command"] for entry in display_4c)
         )
 
+    def test_non_display_projects_use_historical_default_command(self) -> None:
+        matrix = router.idf_matrix(sorted(self.idf))["include"]
+        non_display = [
+            entry for entry in matrix
+            if entry["project_name"][:2] in {"01", "02", "03", "04", "05", "06"}
+        ]
+        self.assertEqual(12, len(non_display))
+        self.assertTrue(all(entry["command"] == "idf.py build" for entry in non_display))
+        project01 = [entry for entry in non_display if entry["project_name"].startswith("01_")]
+        self.assertEqual(2, len(project01))
+        self.assertTrue(all("SDKCONFIG_DEFAULTS" not in entry["command"] for entry in project01))
+
     def test_phone_display_and_flash_defaults_match_the_product(self) -> None:
         project = ROOT / router.PHONE_PROJECT
         defaults = (project / "sdkconfig.defaults").read_text(encoding="utf-8")

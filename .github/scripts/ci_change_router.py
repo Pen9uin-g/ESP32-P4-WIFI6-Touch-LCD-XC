@@ -329,20 +329,22 @@ def idf_matrix(projects: list[str]) -> dict[str, list[dict[str, str]]]:
         configurations = ("default", "vendor-only") if project == USB_PROJECT else ("default",)
         for variant in variants:
             for configuration in configurations:
-                defaults = list(DISPLAY_BASE_DEFAULTS.get(project, ("sdkconfig.defaults",)))
                 if project in DISPLAY_PROJECTS:
+                    defaults = list(DISPLAY_BASE_DEFAULTS.get(project, ("sdkconfig.defaults",)))
                     # Project 11 already records 3.4C in its default file, but an
                     # explicit overlay keeps the matrix contract uniform.
                     defaults.append("sdkconfig.ci.3_4c" if variant["screen"] == "3.4C" else "sdkconfig.ci.4c")
-                vendor_only = configuration == "vendor-only"
-                if vendor_only:
-                    defaults.append("sdkconfig.ci.vendor-only")
-                command_parts = []
-                if vendor_only:
-                    command_parts.append('-D "USB_DEVICE_UAC_COMPONENT=OFF"')
-                command_parts.append('-D "SDKCONFIG_DEFAULTS=' + ";".join(defaults) + '"')
-                command_parts.append("build")
-                command = "idf.py " + " ".join(command_parts)
+                    vendor_only = configuration == "vendor-only"
+                    if vendor_only:
+                        defaults.append("sdkconfig.ci.vendor-only")
+                    command_parts = []
+                    if vendor_only:
+                        command_parts.append('-D "USB_DEVICE_UAC_COMPONENT=OFF"')
+                    command_parts.append('-D "SDKCONFIG_DEFAULTS=' + ";".join(defaults) + '"')
+                    command_parts.append("build")
+                    command = "idf.py " + " ".join(command_parts)
+                else:
+                    command = "idf.py build"
                 for idf_version in DEFAULT_IDF_VERSIONS:
                     artifact_key = "-".join((
                         "xc", variant["variant_id"], "esp-idf",
