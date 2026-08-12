@@ -151,6 +151,21 @@ class RouterTests(unittest.TestCase):
         self.assertEqual([], route["idf_projects"])
         self.assertEqual([], route["arduino_sketches"])
 
+    def test_flash_helper_changes_are_classified_non_build_policy(self) -> None:
+        route = router.route_changes(
+            [
+                router.Change("M", ("Flash-CI-Firmware.cmd",)),
+                router.Change("M", ("scripts/Flash-CI-Firmware.ps1",)),
+            ],
+            self.idf,
+            self.arduino,
+        )
+        self.assertTrue(route["docs_only"])
+        self.assertEqual([], route["idf_projects"])
+        self.assertEqual([], route["arduino_sketches"])
+        self.assertFalse(route["firmware_selected"])
+        self.assertEqual([], route["unknown_paths"])
+
     def test_markdown_inside_projects_and_bundled_libraries_selects_no_builds(self) -> None:
         route = router.route_changes(
             [

@@ -60,11 +60,13 @@ ARDUINO_GLOBAL_PATHS = {
 POLICY_PATHS = {
     ".gitignore",
     "LICENSE",
+    "Flash-CI-Firmware.cmd",
     ".github/workflows/documentation.yml",
     ".github/scripts/audit_markdown.py",
     ".github/scripts/ci-routing-audit-config.json",
     ".github/scripts/markdown-audit-config.json",
     ".github/scripts/repo_self_check.py",
+    "scripts/Flash-CI-Firmware.ps1",
 }
 POLICY_PREFIXES = (
     ".github/ISSUE_TEMPLATE/",
