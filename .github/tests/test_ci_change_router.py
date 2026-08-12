@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "scripts" / "ci_change_router.py"
 IDF_WORKFLOW = ROOT / ".github" / "workflows" / "esp-idf-projects.yml"
 ARDUINO_WORKFLOW = ROOT / ".github" / "workflows" / "arduino-projects.yml"
+FIRMWARE_WORKFLOW = ROOT / ".github" / "workflows" / "maintained-firmware.yml"
+FIRMWARE_BUILD_SCRIPT = ROOT / ".github" / "scripts" / "build_maintained_firmware.sh"
 POLICY_WORKFLOW = ROOT / ".github" / "workflows" / "documentation.yml"
 ROUTING_AUDIT_CONFIG = ROOT / ".github" / "scripts" / "ci-routing-audit-config.json"
 SPEC = importlib.util.spec_from_file_location("ci_change_router", SCRIPT)
@@ -271,6 +273,15 @@ class RouterTests(unittest.TestCase):
         self.assertEqual([], route["arduino_sketches"])
         self.assertTrue(route["firmware_selected"])
         self.assertEqual(2, len(router.firmware_matrix(True)["include"]))
+
+    def test_maintained_firmware_build_wrapper_is_profile_safe(self) -> None:
+        workflow = FIRMWARE_WORKFLOW.read_text(encoding="utf-8")
+        script = FIRMWARE_BUILD_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("bash ../../.github/scripts/build_maintained_firmware.sh '${{ matrix.profile_id }}'", workflow)
+        self.assertIn("rev1_3|rev3_x", script)
+        self.assertIn('export SDKCONFIG="sdkconfig.ci.generated-$profile_id"', script)
+        self.assertIn('export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.$profile_id"', script)
+        self.assertIn('exec idf.py -B "build-$profile_id" build', script)
 
     def test_unknown_path_is_conservative_and_reported(self) -> None:
         route = router.route_changes(

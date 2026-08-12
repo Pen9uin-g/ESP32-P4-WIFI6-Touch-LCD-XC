@@ -24,6 +24,7 @@ REQUIRED_FILES = (
     Path("examples/README.md"),
     Path("examples/arduino/README.md"),
     Path(".github/scripts/audit_markdown.py"),
+    Path(".github/scripts/build_maintained_firmware.sh"),
     Path(".github/scripts/ci_change_router.py"),
     Path(".github/scripts/package_build_artifact.py"),
     Path(".github/scripts/ci-routing-audit-config.json"),

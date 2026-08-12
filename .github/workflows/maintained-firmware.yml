@@ -55,7 +55,7 @@ jobs:
           esp_idf_version: v5.5.5
           target: esp32p4
           path: ${{ matrix.project }}
-          command: SDKCONFIG='${{ matrix.sdkconfig }}' SDKCONFIG_DEFAULTS='${{ matrix.sdkconfig_defaults }}' idf.py -B '${{ matrix.build_dir }}' build
+          command: bash ../../.github/scripts/build_maintained_firmware.sh '${{ matrix.profile_id }}'
       - id: package
         shell: bash
         env:

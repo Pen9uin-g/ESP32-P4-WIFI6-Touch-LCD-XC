@@ -46,7 +46,10 @@ GLOBAL_BOTH_PATHS = {
     ".github/scripts/ci_change_router.py",
     ".github/scripts/package_build_artifact.py",
 }
-FIRMWARE_GLOBAL_PATHS = {".github/workflows/maintained-firmware.yml"}
+FIRMWARE_GLOBAL_PATHS = {
+    ".github/scripts/build_maintained_firmware.sh",
+    ".github/workflows/maintained-firmware.yml",
+}
 # Keep the legacy classifier paths as routing inputs so their deletion or a
 # later rename still selects the matrix whose behavior changed.
 IDF_GLOBAL_PATHS = {

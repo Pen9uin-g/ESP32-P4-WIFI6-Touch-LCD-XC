@@ -14,6 +14,7 @@
     "**/*.pyc"
   ],
   "global_build_patterns": [
+    ".github/scripts/build_maintained_firmware.sh",
     ".github/scripts/ci_change_router.py",
     ".github/scripts/package_build_artifact.py",
     ".github/workflows/maintained-firmware.yml",
