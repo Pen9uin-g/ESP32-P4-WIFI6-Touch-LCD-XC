@@ -46,6 +46,11 @@ class RouterTests(unittest.TestCase):
         self.assertEqual({"3_4c", "4c"}, {entry["variant_id"] for entry in matrix if entry["project"] in router.DISPLAY_PROJECTS})
         self.assertTrue(all(entry["artifact_key"].startswith("xc-") for entry in matrix))
         self.assertTrue(all("-esp-idf-" in entry["artifact_key"] for entry in matrix))
+        firmware = router.firmware_matrix(True)["include"]
+        self.assertEqual(2, len(firmware))
+        self.assertEqual(2, len({entry["build_dir"] for entry in firmware}))
+        self.assertEqual(2, len({entry["sdkconfig"] for entry in firmware}))
+        self.assertEqual({"rev1_3", "rev3_x"}, {entry["profile_id"] for entry in firmware})
 
     def test_phone_matrix_has_34c_and_4c_variants(self) -> None:
         entries = router.idf_matrix([router.PHONE_PROJECT])["include"]
@@ -236,6 +241,21 @@ class RouterTests(unittest.TestCase):
         self.assertEqual([], route["arduino_sketches"])
         self.assertEqual(2, len(route["firmware_paths"]))
         self.assertEqual(["firmware/brookesia/release/factory.bin"], route["release_paths"])
+        self.assertTrue(route["firmware_selected"])
+
+    def test_firmware_docs_and_delivery_do_not_build(self) -> None:
+        for path in ("firmware/brookesia/README.md", "firmware/brookesia/release/factory.bin"):
+            with self.subTest(path=path):
+                route = router.route_changes([router.Change("M", (path,))], self.idf, self.arduino)
+                self.assertFalse(route["firmware_selected"])
+                self.assertEqual([], router.firmware_matrix(route["firmware_selected"])["include"])
+
+    def test_maintained_workflow_selects_only_firmware(self) -> None:
+        route = router.route_changes([router.Change("M", (".github/workflows/maintained-firmware.yml",))], self.idf, self.arduino)
+        self.assertEqual([], route["idf_projects"])
+        self.assertEqual([], route["arduino_sketches"])
+        self.assertTrue(route["firmware_selected"])
+        self.assertEqual(2, len(router.firmware_matrix(True)["include"]))
 
     def test_unknown_path_is_conservative_and_reported(self) -> None:
         route = router.route_changes(

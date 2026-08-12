@@ -67,6 +67,12 @@ instructions.
 CI tests every first-party ESP-IDF project with ESP-IDF `v5.5.5` and
 `v6.0.2`.
 
+All examples default to the `rev1_3` (pre-v3) ESP32-P4 profile. `rev1_3` and
+`rev3_x` binaries are incompatible; examples are not doubled. The matching
+Arduino FQBN uses `ChipVariant=prev3`; revision profiles are metadata, not
+additional example matrix axes. Binaries for another silicon profile are not
+interchangeable.
+
 ```bash
 cd examples/esp-idf/02_HelloWorld
 idf.py set-target esp32p4
@@ -125,14 +131,16 @@ platform guidance.
 | --- | --- |
 | Repository self-check | Documentation, project structure, and first-party sketch layout |
 | ESP-IDF | 12 first-party projects × ESP-IDF `v5.5.5`/`v6.0.2`: 01–06 each build one shared non-display configuration per ESP-IDF line (12 jobs), 07–11 build both 3.4C and 4C displays (20 jobs), and USB builds both displays with default and vendor-only configurations (8 jobs); 40 jobs on a complete route |
-| Arduino | 5 first-party sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays |
+| Arduino | 5 first-party `rev1_3` sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays (10 jobs) |
+| Maintained firmware | Two ESP-IDF `v5.5.5` P4-only artifacts for `firmware/brookesia`: `rev1_3` and `rev3_x`; 3.4C is the firmware default |
 
 Every pull request gets visible policy, ESP-IDF-routing, and Arduino-routing
 results. Documentation-only changes skip product build jobs. Source or shared
 build-input changes select the affected matrix, and unknown paths fail policy
 after conservatively selecting both complete matrices. The maintained
-`firmware/` source project receives a visible routing flag but remains outside
-the default example matrix. Bundled library examples are excluded from
+`firmware/` source selects its separate two-profile firmware workflow but remains
+outside the default example matrix. A complete artifact set has 52 items
+(40 ESP-IDF examples + 10 Arduino examples + 2 maintained firmware). Bundled library examples are excluded from
 discovery. See [Continuous Integration](docs/CI.md) for exact behavior.
 
 ## 🗂️ Repository Layout

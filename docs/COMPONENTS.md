@@ -8,22 +8,15 @@ can be removed.
 
 ## Registry-backed board support
 
-Examples 07 through 12 carry registry-shaped local copies of Waveshare's
-`waveshare/esp32_p4_wifi6_touch_lcd_xc` BSP at version `2.0.0`. Their first-party
-manifests now require that exact version instead of a floating wildcard, so a
-future registry release cannot silently replace the checked-in source.
+Examples 07 through 12 and the maintained firmware use the managed
+[`waveshare/esp32_p4_wifi6_touch_lcd_xc`](https://components.espressif.com/components/waveshare/esp32_p4_wifi6_touch_lcd_xc)
+BSP pinned exactly to `3.0.1`. No vendored copy of that BSP remains in an
+example; `bsp_extra` and unrelated local components remain local.
 
-The six copies are not interchangeable cache output. Examples 08 and 09 carry
-the board-specific `GPIO23` GT911 reset definition while the other four leave
-the touch-reset GPIO unconnected, and two copies have a semantically equivalent
-CMake dependency ordering difference. They remain local until those differences
-are either upstreamed or proven unnecessary.
-
-The [Component Registry](https://components.espressif.com/components/waveshare/esp32_p4_wifi6_touch_lcd_xc)
-currently advertises `3.0.1`, a semver-major change from the local `2.0.0`
-snapshot, with an additional dependency. A future managed-component migration
-must compare exported APIs, Kconfig, GPIO23 behavior, both ESP-IDF lines, P4
-revision requirements, and both display variants before changing the boundary.
+The official `3.0.1` BSP uses `GPIO_NUM_NC` for touch reset, whereas prior local
+copies in examples 08 and 09 used GPIO23. This migration deliberately does not
+invent a global GPIO override: the schematic evidence is insufficient. A touch
+reset regression check on real hardware is required for every affected board.
 
 The USB extend-screen example also pins `espressif/tinyusb` to `0.17.0~2`, the
 exact release permitted by its `espressif/usb_device_uac` `1.2.0` dependency.
@@ -48,8 +41,8 @@ and this repository also validates ESP-IDF 5.5; see the Component Manager's
 | `examples/esp-idf/12_usb_extend_screen/components/bsp_extra` | USB/display example-specific board glue |
 
 The `firmware/brookesia/components/` tree is a separate maintained firmware
-surface. It is inventoried but is not changed, repinned, or added to default
-example CI by this repository workflow.
+surface. Its BSP consumer is also pinned to `3.0.1`; its two revision profiles
+are built separately from the unchanged example matrix.
 
 When a reusable correction is needed in the shared Waveshare component
 repository, request authorization for that upstream change before publishing a

@@ -22,6 +22,8 @@ IDF_ROOT = Path("examples/esp-idf")
 ARDUINO_ROOT = Path("examples/arduino/examples")
 ARDUINO_LIBRARY_ROOT = "examples/arduino/libraries"
 DEFAULT_IDF_VERSIONS = ("v5.5.5", "v6.0.2")
+DEFAULT_PROFILE_ID = "rev1_3"
+FIRMWARE_PROJECT = "firmware/brookesia"
 SCREEN_VARIANTS = (
     {"screen": "3.4C", "variant_id": "3_4c", "screen_define": "SCREEN_3INCH_4_DSI", "resolution": "800x800"},
     {"screen": "4C", "variant_id": "4c", "screen_define": "SCREEN_4INCH_DSI", "resolution": "720x720"},
@@ -44,6 +46,7 @@ GLOBAL_BOTH_PATHS = {
     ".github/scripts/ci_change_router.py",
     ".github/scripts/package_build_artifact.py",
 }
+FIRMWARE_GLOBAL_PATHS = {".github/workflows/maintained-firmware.yml"}
 # Keep the legacy classifier paths as routing inputs so their deletion or a
 # later rename still selects the matrix whose behavior changed.
 IDF_GLOBAL_PATHS = {
@@ -245,6 +248,7 @@ def route_changes(
 ) -> dict[str, object]:
     selected_idf: set[str] = set()
     selected_arduino: set[str] = set()
+    firmware_selected = False
     firmware_paths: set[str] = set()
     release_paths: set[str] = set()
     unknown_paths: set[str] = set()
@@ -256,12 +260,18 @@ def route_changes(
 
         if path == "firmware" or path.startswith("firmware/"):
             firmware_paths.add(path)
+            if not path_is_documentation(path) and not path_is_release_artifact(path):
+                firmware_selected = True
             continue
         if path_is_documentation(path):
             continue
         if path in GLOBAL_BOTH_PATHS:
             selected_idf.update(known_idf)
             selected_arduino.update(known_arduino)
+            firmware_selected = True
+            continue
+        if path in FIRMWARE_GLOBAL_PATHS:
+            firmware_selected = True
             continue
         if path in IDF_GLOBAL_PATHS or path == "config" or path.startswith("config/"):
             selected_idf.update(known_idf)
@@ -294,8 +304,9 @@ def route_changes(
         unknown_paths.add(path)
         selected_idf.update(known_idf)
         selected_arduino.update(known_arduino)
+        firmware_selected = True
 
-    docs_only = bool(all_paths) and not firmware_paths and not release_paths and all(
+    docs_only = bool(all_paths) and not release_paths and all(
         path_is_documentation(path) for path in all_paths
     )
     return {
@@ -304,6 +315,7 @@ def route_changes(
         "arduino_sketches": sorted(selected_arduino),
         "docs_only": docs_only,
         "firmware_paths": sorted(firmware_paths),
+        "firmware_selected": firmware_selected,
         "release_paths": sorted(release_paths),
         "unknown_paths": sorted(unknown_paths),
     }
@@ -348,6 +360,7 @@ def idf_matrix(projects: list[str]) -> dict[str, list[dict[str, str]]]:
                 for idf_version in DEFAULT_IDF_VERSIONS:
                     artifact_key = "-".join((
                         "xc", variant["variant_id"], "esp-idf",
+                        DEFAULT_PROFILE_ID,
                         "v" + idf_version.lstrip("v").replace(".", "-"),
                         Path(project).name, configuration,
                     ))
@@ -357,6 +370,7 @@ def idf_matrix(projects: list[str]) -> dict[str, list[dict[str, str]]]:
                             "project_name": Path(project).name,
                             "idf_version": idf_version,
                             "configuration": configuration,
+                            "profile_id": DEFAULT_PROFILE_ID,
                             "variant": variant["screen"],
                             "variant_id": variant["variant_id"],
                             "resolution": variant["resolution"],
@@ -375,9 +389,11 @@ def arduino_matrix(sketches: list[str]) -> dict[str, list[dict[str, str]]]:
                 "sketch_name": Path(sketch).name,
                 **variant,
                 "configuration": "default",
+                "profile_id": DEFAULT_PROFILE_ID,
                 "variant": variant["screen"],
                 "artifact_key": "-".join((
                     "xc", variant["variant_id"], "arduino", "3-3-11",
+                    DEFAULT_PROFILE_ID,
                     Path(sketch).name, "default",
                 )),
             }
@@ -385,6 +401,22 @@ def arduino_matrix(sketches: list[str]) -> dict[str, list[dict[str, str]]]:
             for variant in SCREEN_VARIANTS
         ]
     }
+
+
+def firmware_matrix(selected: bool) -> dict[str, list[dict[str, str]]]:
+    """Two independent maintained-firmware profiles; never expand examples."""
+    if not selected:
+        return {"include": []}
+    return {"include": [
+        {"project": FIRMWARE_PROJECT, "project_name": "brookesia", "profile_id": "rev1_3",
+         "build_dir": "build-rev1_3", "sdkconfig": "sdkconfig.ci.generated-rev1_3",
+         "sdkconfig_defaults": "sdkconfig.defaults;sdkconfig.defaults.rev1_3",
+         "artifact_key": "xc-3_4c-maintained-firmware-rev1_3-brookesia-default"},
+        {"project": FIRMWARE_PROJECT, "project_name": "brookesia", "profile_id": "rev3_x",
+         "build_dir": "build-rev3_x", "sdkconfig": "sdkconfig.ci.generated-rev3_x",
+         "sdkconfig_defaults": "sdkconfig.defaults;sdkconfig.defaults.rev3_x",
+         "artifact_key": "xc-3_4c-maintained-firmware-rev3_x-brookesia-default"},
+    ]}
 
 
 def github_output(name: str, value: str) -> None:
@@ -400,9 +432,11 @@ def emit_route(route: dict[str, object]) -> None:
     arduino_sketches = list(route["arduino_sketches"])
     route["idf_matrix"] = idf_matrix(idf_projects)
     route["arduino_matrix"] = arduino_matrix(arduino_sketches)
+    route["firmware_matrix"] = firmware_matrix(bool(route["firmware_selected"]))
     route["has_idf"] = bool(idf_projects)
     route["has_arduino"] = bool(arduino_sketches)
     route["firmware_touched"] = bool(route["firmware_paths"])
+    route["has_firmware"] = bool(route["firmware_matrix"]["include"])
     route["release_review"] = bool(route["release_paths"])
 
     compact = lambda value: json.dumps(value, separators=(",", ":"))
@@ -413,6 +447,8 @@ def emit_route(route: dict[str, object]) -> None:
         "arduino_matrix": compact(route["arduino_matrix"]),
         "has_arduino": str(route["has_arduino"]).lower(),
         "arduino_sketches": ",".join(arduino_sketches),
+        "firmware_matrix": compact(route["firmware_matrix"]),
+        "has_firmware": str(route["has_firmware"]).lower(),
         "docs_only": str(route["docs_only"]).lower(),
         "firmware_touched": str(route["firmware_touched"]).lower(),
         "release_review": str(route["release_review"]).lower(),
@@ -450,6 +486,7 @@ def main() -> int:
             route = route_changes([], known_idf, known_arduino)
             route["idf_projects"] = sorted(known_idf)
             route["arduino_sketches"] = sorted(known_arduino)
+            route["firmware_selected"] = True
         elif manual_mode:
             route = route_changes([], known_idf, known_arduino)
             if args.manual_idf is not None:

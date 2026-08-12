@@ -12,6 +12,7 @@
 | [Documentation and repository policy](../.github/workflows/documentation.yml) | 始终可见的单元测试、Markdown、结构和路由策略检查 |
 | [ESP-IDF projects](../.github/workflows/esp-idf-projects.yml) | 按变更选择 ESP32-P4 一方 ESP-IDF 示例构建 |
 | [Arduino projects](../.github/workflows/arduino-projects.yml) | 按变更选择 ESP32-P4 一方 Arduino 示例构建 |
+| [Maintained firmware](../.github/workflows/maintained-firmware.yml) | 按变更选择、仅限 P4 的 `firmware/brookesia` profile；与示例分离 |
 
 三个工作流都会在每个 Pull Request 和推送到 `main` 时启动。产品工作流始终显示
 路由结果，只有路由选中产品工程时才运行昂贵的构建任务。同一 Pull Request 出现
@@ -60,8 +61,10 @@ python .github/scripts/ci_change_router.py --base-ref <base-sha> --head-ref <hea
 | `.bin`、`.zip` 等固件/归档镜像 | 固件结果并标记必须显式发布审核 |
 | 未分类的非文档路径 | 双完整矩阵并使严格策略失败 |
 
-`firmware/brookesia` 是单独维护的交付/源码面。它会被盘点，但不会仅因目录中存在
-ESP-IDF 工程就被当作另一个示例，也不会凭空获得未经验证的构建命令。
+`firmware/brookesia` 是单独维护的交付/源码面，不会被当作另一个示例。路由选中时，
+专用工作流只构建两个独立的 ESP-IDF `v5.5.5`、32 MB、P4 产物：默认 3.4C 的
+`rev1_3` 和 `rev3_x`。两者二进制不兼容；示例不会为 `rev3_x` 翻倍，仍只使用
+`rev1_3`。C6 Hosted 镜像是运行时依赖，不是这些产物内的 C6 二进制文件。
 
 ## ESP-IDF 矩阵
 
@@ -72,6 +75,7 @@ ESP-IDF 工程就被当作另一个示例，也不会凭空获得未经验证的
 | --- | --- |
 | ESP-IDF | `v5.5.5`、`v6.0.2` |
 | Target | `esp32p4` |
+| Silicon profile | `rev1_3` / ESP32-P4 revision < 3.0 |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
 
 完整路由包含 40 个任务：01–06 工程使用共享/default 配置（6 × 2）；07–11 显示
@@ -91,6 +95,7 @@ UAC 音频，并在依赖解析阶段省略托管 UAC 组件。
 | --- | --- |
 | Arduino-ESP32 | `3.3.11` |
 | 开发板 | 通用 ESP32-P4、pre-v3 silicon、32 MB Flash、启用 PSRAM |
+| Silicon profile | 仅 `rev1_3`；示例不会因 `rev3_x` 翻倍 |
 | 显示变体 | 3.4C（`SCREEN_3INCH_4_DSI`）、4C（`SCREEN_4INCH_DSI`） |
 | 内置库 | `examples/arduino/libraries/` |
 

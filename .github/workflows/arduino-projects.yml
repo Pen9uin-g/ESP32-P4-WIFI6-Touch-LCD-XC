@@ -91,7 +91,7 @@ jobs:
           fi
 
   build:
-    name: Build ${{ matrix.sketch_name }} (${{ matrix.screen }})
+    name: Build ${{ matrix.sketch_name }} / ${{ matrix.profile_id }} (${{ matrix.screen }})
     needs: discover
     if: needs.discover.outputs.has_sketches == 'true'
     runs-on: ubuntu-latest
@@ -153,7 +153,8 @@ jobs:
             --resolution "${{ matrix.resolution }}" --configuration "${{ matrix.configuration }}" \
             --framework-version "$ARDUINO_CORE_VERSION" --target esp32p4 \
             --project "${{ matrix.sketch }}" --sketch "${{ matrix.sketch_name }}" \
-            --fqbn "$ARDUINO_FQBN" --git-sha "$git_sha"
+            --fqbn "$ARDUINO_FQBN" --profile-id "${{ matrix.profile_id }}" \
+            --build-options "$build_path/build.options.json" --git-sha "$git_sha"
           echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
           echo "path=$output" >> "$GITHUB_OUTPUT"
 

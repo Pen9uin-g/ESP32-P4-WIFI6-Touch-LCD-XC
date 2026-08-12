@@ -58,6 +58,10 @@ MIPI-DSI 触控屏，适合用于图形化人机交互、多媒体应用、边�
 
 CI 使用 ESP-IDF `v5.5.5` 和 `v6.0.2` 测试全部一方 ESP-IDF 工程。
 
+所有示例默认使用 `rev1_3`（pre-v3）ESP32-P4 profile。对应 Arduino FQBN 使用
+`ChipVariant=prev3`；revision profile 只是元数据，不会增加示例矩阵维度。不同芯片
+profile 的二进制文件不能互换。
+
 ```bash
 cd examples/esp-idf/02_HelloWorld
 idf.py set-target esp32p4
@@ -114,12 +118,14 @@ idf.py -p PORT flash monitor
 | --- | --- |
 | 仓库自检 | 文档、工程结构与一方 Arduino 示例目录 |
 | ESP-IDF | 12 个一方工程 × ESP-IDF `v5.5.5`/`v6.0.2`：01–06 在每个 ESP-IDF 版本各构建一个共享的非显示配置（12 个任务），07–11 同时构建 3.4C 与 4C 显示配置（20 个任务），USB 同时构建双显示配置及 default/vendor-only 配置（8 个任务）；完整路由共 40 个任务 |
-| Arduino | 5 个一方示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置 |
+| Arduino | 5 个一方 `rev1_3` 示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置（10 个任务） |
+| 维护固件 | `firmware/brookesia` 的两个 ESP-IDF `v5.5.5` P4-only 产物：`rev1_3` 和 `rev3_x`；固件默认使用 3.4C |
 
 每个 Pull Request 都会得到可见的策略、ESP-IDF 路由和 Arduino 路由结论。纯文档
 改动会跳过产品构建；源码或共享构建输入只选择受影响矩阵；未知路径会先保守选择
-双完整矩阵，再使策略检查失败。`firmware/` 下维护中的源码工程会得到可见路由标记，
-但不会进入默认示例矩阵；配套库自带的上游示例不会进入发现矩阵。详细行为请参阅
+双完整矩阵，再使策略检查失败。`firmware/` 下维护中的源码工程会选择单独的双 profile
+固件工作流，但不会进入默认示例矩阵；完整产物集合共 52 项（40 ESP-IDF 示例 + 10 Arduino
+示例 + 2 维护固件）。配套库自带的上游示例不会进入发现矩阵。详细行为请参阅
 [持续集成说明](docs/CI_ZH.md)。
 
 ## 🗂️ 仓库结构

@@ -13,6 +13,7 @@ Actions after the change is committed and pushed.
 | [Documentation and repository policy](../.github/workflows/documentation.yml) | Always-visible unit, Markdown, structure, and routing-policy checks |
 | [ESP-IDF projects](../.github/workflows/esp-idf-projects.yml) | Conditional ESP32-P4 builds for first-party ESP-IDF examples |
 | [Arduino projects](../.github/workflows/arduino-projects.yml) | Conditional ESP32-P4 builds for first-party Arduino sketches |
+| [Maintained firmware](../.github/workflows/maintained-firmware.yml) | Conditional, P4-only `firmware/brookesia` profiles; separate from examples |
 
 All three workflows start on every pull request and on pushes to `main`. The
 product workflows always expose their routing result, while their expensive
@@ -67,9 +68,11 @@ fallback selects both complete product matrices.
 | Unknown non-documentation path | Both complete matrices and strict policy failure |
 
 `firmware/brookesia` is a separately maintained delivery/source surface. It is
-inventoried, but it is not treated as another example and does not gain an
-unverified build command merely because its directory contains an ESP-IDF
-project.
+not treated as another example. When its route is selected, its dedicated
+workflow builds exactly two independent ESP-IDF `v5.5.5`, 32 MB P4 artifacts:
+3.4C-default `rev1_3` and `rev3_x`. The profiles are incompatible binaries;
+examples are not doubled and remain `rev1_3` only. The C6 Hosted image is a
+runtime dependency, not a C6 binary in these artifacts.
 
 ## ESP-IDF matrix
 
@@ -80,6 +83,7 @@ a direct child of `examples/esp-idf/`. Every selected project builds with:
 | --- | --- |
 | ESP-IDF | `v5.5.5`, `v6.0.2` |
 | Target | `esp32p4` |
+| Silicon profile | `rev1_3` / ESP32-P4 revision < 3.0 |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
 
 The complete route contains 40 jobs: projects 01–06 use the shared/default
@@ -104,6 +108,7 @@ sketch builds for both displays:
 | --- | --- |
 | Arduino-ESP32 | `3.3.11` |
 | Board | Generic ESP32-P4, pre-v3 silicon, 32 MB flash, PSRAM enabled |
+| Silicon profile | `rev1_3` only; examples are not doubled for `rev3_x` |
 | Display variants | 3.4C (`SCREEN_3INCH_4_DSI`), 4C (`SCREEN_4INCH_DSI`) |
 | Bundled libraries | `examples/arduino/libraries/` |
 

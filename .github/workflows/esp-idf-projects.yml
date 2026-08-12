@@ -99,7 +99,7 @@ jobs:
           fi
 
   build:
-    name: Build ${{ matrix.project_name }} / ${{ matrix.variant }} / ${{ matrix.configuration }} (${{ matrix.idf_version }})
+    name: Build ${{ matrix.project_name }} / ${{ matrix.profile_id }} / ${{ matrix.variant }} / ${{ matrix.configuration }} (${{ matrix.idf_version }})
     needs:
       - self-check
       - discover
@@ -137,7 +137,8 @@ jobs:
             --variant-id "${{ matrix.variant_id }}" \
             --resolution "${{ matrix.resolution }}" --configuration "${{ matrix.configuration }}" \
             --framework-version "${{ matrix.idf_version }}" --target esp32p4 \
-            --project "${{ matrix.project }}" --git-sha "$git_sha"
+            --project "${{ matrix.project }}" --profile-id "${{ matrix.profile_id }}" \
+            --sdkconfig "${{ matrix.project }}/sdkconfig" --git-sha "$git_sha"
           echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
           echo "path=$output" >> "$GITHUB_OUTPUT"
 
