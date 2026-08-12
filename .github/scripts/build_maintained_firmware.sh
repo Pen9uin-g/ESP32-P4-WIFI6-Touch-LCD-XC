@@ -10,6 +10,6 @@ case "$profile_id" in
     ;;
 esac
 
-export SDKCONFIG="sdkconfig.ci.generated-$profile_id"
 export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.$profile_id"
-exec idf.py -B "build-$profile_id" build
+sdkconfig_path="$(pwd)/sdkconfig.ci.generated-$profile_id"
+exec idf.py -B "build-$profile_id" -D "SDKCONFIG=$sdkconfig_path" build

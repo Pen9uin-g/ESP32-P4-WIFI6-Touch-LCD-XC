@@ -279,9 +279,12 @@ class RouterTests(unittest.TestCase):
         script = FIRMWARE_BUILD_SCRIPT.read_text(encoding="utf-8")
         self.assertIn("bash ../../.github/scripts/build_maintained_firmware.sh '${{ matrix.profile_id }}'", workflow)
         self.assertIn("rev1_3|rev3_x", script)
-        self.assertIn('export SDKCONFIG="sdkconfig.ci.generated-$profile_id"', script)
         self.assertIn('export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.$profile_id"', script)
-        self.assertIn('exec idf.py -B "build-$profile_id" build', script)
+        self.assertIn('sdkconfig_path="$(pwd)/sdkconfig.ci.generated-$profile_id"', script)
+        self.assertIn(
+            'exec idf.py -B "build-$profile_id" -D "SDKCONFIG=$sdkconfig_path" build',
+            script,
+        )
 
     def test_unknown_path_is_conservative_and_reported(self) -> None:
         route = router.route_changes(
