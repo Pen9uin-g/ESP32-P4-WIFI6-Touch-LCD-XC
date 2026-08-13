@@ -9,18 +9,18 @@
 
 | 路径 | 方向 |
 | --- | --- |
-| `examples/esp-idf/01_HowToCreateProject` | 最小 ESP-IDF 工程结构 |
-| `examples/esp-idf/02_HelloWorld` | 基础 ESP-IDF 应用 |
-| `examples/esp-idf/03_i2c_tools` | I2C 扫描和命令工具 |
-| `examples/esp-idf/04_wifistation` | Wi-Fi station 连接 |
-| `examples/esp-idf/05_sdmmc` | SD 卡与 SDMMC |
-| `examples/esp-idf/06_I2SCodec` | I2S 音频编解码 |
-| `examples/esp-idf/07_Displaycolorbar` | LCD 彩条显示 |
-| `examples/esp-idf/08_lvgl_demo_v9` | LVGL v9 显示示例 |
-| `examples/esp-idf/09_video_lcd_display` | 摄像头到显示屏视频链路 |
-| `examples/esp-idf/10_mp4_player` | MP4/AVI 播放 |
-| `examples/esp-idf/11_esp_brookesia_phone` | ESP-Brookesia 类手机界面 |
-| `examples/esp-idf/12_usb_extend_screen` | USB 扩展屏 |
+| [`examples/esp-idf/01_HowToCreateProject`](esp-idf/01_HowToCreateProject/README_ZH.md) | 最小 ESP-IDF 工程结构 |
+| [`examples/esp-idf/02_HelloWorld`](esp-idf/02_HelloWorld/README_ZH.md) | 基础 ESP-IDF 应用 |
+| [`examples/esp-idf/03_i2c_tools`](esp-idf/03_i2c_tools/README_ZH.md) | I2C 扫描和命令工具 |
+| [`examples/esp-idf/04_wifistation`](esp-idf/04_wifistation/README_ZH.md) | Wi-Fi station 连接 |
+| [`examples/esp-idf/05_sdmmc`](esp-idf/05_sdmmc/README_ZH.md) | SD 卡与 SDMMC |
+| [`examples/esp-idf/06_I2SCodec`](esp-idf/06_I2SCodec/README_ZH.md) | I2S 音频编解码 |
+| [`examples/esp-idf/07_Displaycolorbar`](esp-idf/07_Displaycolorbar/README_ZH.md) | LCD 彩条显示 |
+| [`examples/esp-idf/08_lvgl_demo_v9`](esp-idf/08_lvgl_demo_v9/README_ZH.md) | LVGL v9 显示示例 |
+| [`examples/esp-idf/09_video_lcd_display`](esp-idf/09_video_lcd_display/README_ZH.md) | 摄像头到显示屏视频链路 |
+| [`examples/esp-idf/10_mp4_player`](esp-idf/10_mp4_player/README_ZH.md) | MP4/AVI 播放 |
+| [`examples/esp-idf/11_esp_brookesia_phone`](esp-idf/11_esp_brookesia_phone/README_ZH.md) | ESP-Brookesia 类手机界面 |
+| [`examples/esp-idf/12_usb_extend_screen`](esp-idf/12_usb_extend_screen/README_ZH.md) | USB 扩展屏 |
 
 ## Arduino
 

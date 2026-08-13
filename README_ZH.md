@@ -44,7 +44,7 @@ MIPI-DSI 触控屏，适合用于图形化人机交互、多媒体应用、边�
 | 存储 | 封装内置 32 MB PSRAM，板载 32 MB NOR Flash |
 | 无线连接 | ESP32-C6-MINI-1 通过 SDIO 提供 2.4 GHz Wi-Fi 6 和 Bluetooth 5 (LE) |
 | 显示 | 2-lane MIPI-DSI 圆形 IPS LCD；3.4 英寸 800 × 800 或 4 英寸 720 × 720 |
-| 触控 | 电容触控接口；示例使用 GT911 兼容驱动 |
+| 触控 | 官方硬件采用 GT9271 电容触控控制器；示例使用托管的 GT911 兼容驱动/API |
 | 摄像头 | 2-lane MIPI-CSI 摄像头接口 |
 | 音频 | ES8311 音频编解码器、ES7210 音频 ADC、板载麦克风和 8 Ω / 2 W 扬声器接口 |
 | 存储卡与 USB | SDIO 3.0 microSD 卡槽和 USB 2.0 OTG High-Speed |

@@ -16,7 +16,7 @@ The following maintained sources provide the software-side contract:
 
 | Surface | Repository evidence |
 | --- | --- |
-| ESP-IDF board support | `examples/esp-idf/*/components/waveshare__esp32_p4_wifi6_touch_lcd_xc/` and its `idf_component.yml` |
+| ESP-IDF board support | Dependency manifests such as `examples/esp-idf/07_Displaycolorbar/main/idf_component.yml`, `examples/esp-idf/08_lvgl_demo_v9/components/bsp_extra/idf_component.yml`, and `firmware/brookesia/components/bsp_extra/idf_component.yml` pin the managed `waveshare/esp32_p4_wifi6_touch_lcd_xc` BSP to `3.0.1`; its source is resolved by the Component Manager, not vendored in this repository |
 | Display variants | BSP headers plus `BSP_LCD_TYPE_800_800_3_4_INCH` / `BSP_LCD_TYPE_720_720_4_INCH` configuration |
 | Arduino display variants | `examples/arduino/libraries/displays/displays_config.h` and `CURRENT_SCREEN` in the first-party sketches |
 | Arduino I2C/touch | `examples/arduino/libraries/displays/i2c.h` and `gt911.h` |
@@ -24,9 +24,21 @@ The following maintained sources provide the software-side contract:
 | Hosted Wi-Fi | `examples/esp-idf/04_wifistation/main/idf_component.yml` |
 
 The examples use GT911-compatible touch APIs. The repository intentionally does
-not duplicate a complete pin table in this document: the schematic, BSP headers,
-and Arduino configuration are the sources to update together when a board-facing
-change is made.
+not duplicate a complete pin table in this document: the schematic, managed BSP
+source, and Arduino configuration are the sources to update together when a
+board-facing change is made.
+
+## Current static audit
+
+| Interface | Static contract and boundary |
+| --- | --- |
+| Display | 3.4C uses `BSP_LCD_TYPE_800_800_3_4_INCH`, 4C uses `BSP_LCD_TYPE_720_720_4_INCH`; both use the MIPI-DSI display path. LCD reset is GPIO27 and backlight PWM is GPIO26. |
+| I2C | SDA is GPIO7 and SCL is GPIO8. |
+| Touch | The official controller is GT9271. `TP_RST`/`CTP_RESET` reaches GPIO23 through 0-ohm R62; `TP_INT`/`CTP_INT` reaches only TP2, with no MCU route. Managed BSP 3.0.1 sets both reset and interrupt to `GPIO_NUM_NC`: interrupt matches that missing route, reset does not match the schematic. |
+| microSD | SD D0..D3 use GPIO39..GPIO42, CLK GPIO43, and CMD GPIO44; this matches the BSP contract. |
+| Audio | ES8311/ES7210 use I2S GPIO9..GPIO13 and PA enable GPIO53; this matches the BSP contract. |
+| Memory | ESP32-P4NRW32 has 32 MB in-package PSRAM and the GD25Q256 provides 32 MB flash; this matches the configured memory profile. |
+| Processor, wireless, and revisions | The schematic identifies the ESP32-P4 and ESP32-C6 board design. Its board revision is rev1.1. `rev1_3` and `rev3_x` are ESP32-P4 silicon compatibility profiles, not PCB revisions; do not infer a board revision from either profile. |
 
 ## Audit rules for future changes
 
@@ -40,7 +52,7 @@ Before changing a hardware constant or board-facing README:
 4. Record whether validation is static (source/schematic) or includes a physical
    board test. A successful CI build proves compilation, not pin correctness.
 
-The current repository work is documentation and CI scoped. It does not change
-the board pin definitions or any delivered firmware artifact; hardware validation
-for a future pin change still requires this schematic cross-check and, where
-possible, a physical board test.
+This PR migrates vendored BSP consumers to managed `3.0.1`. The audited display,
+I2C, microSD, audio, and memory contracts match; touch reset does not. A
+successful compile is not HIL validation, so regression remains required before
+relying on the managed touch-reset contract.

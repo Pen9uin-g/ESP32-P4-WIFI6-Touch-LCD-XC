@@ -13,10 +13,17 @@ Examples 07 through 12 and the maintained firmware use the managed
 BSP pinned exactly to `3.0.1`. No vendored copy of that BSP remains in an
 example; `bsp_extra` and unrelated local components remain local.
 
-The official `3.0.1` BSP uses `GPIO_NUM_NC` for touch reset, whereas prior local
-copies in examples 08 and 09 used GPIO23. This migration deliberately does not
-invent a global GPIO override: the schematic evidence is insufficient. A touch
-reset regression check on real hardware is required for every affected board.
+The schematic gives an exact static contract for the touch signals: the display
+connector's `TP_RST`/`CTP_RESET` is tied through 0-ohm `R62` to GPIO23, while
+`TP_INT`/`CTP_INT` goes only to the `TP2` test point and has no MCU route. The
+managed `3.0.1` BSP sets both touch reset and interrupt to `GPIO_NUM_NC`. The
+interrupt choice matches the absence of an MCU route; the reset choice differs
+from the schematic. This migration does not invent a local override or a
+re-vendored component.
+
+Before changing the product dependency, validate touch operation on real 3.4C
+and 4C boards, then obtain authorization for a correction and release of the
+shared Waveshare component. Until that happens, HIL regression remains required.
 
 The USB extend-screen example also pins `espressif/tinyusb` to `0.17.0~2`, the
 exact release permitted by its `espressif/usb_device_uac` `1.2.0` dependency.
@@ -29,6 +36,23 @@ descriptor types are disabled in the project TinyUSB configuration. The CMake
 option is used because Kconfig-based manifest conditions require ESP-IDF 6.0
 and this repository also validates ESP-IDF 5.5; see the Component Manager's
 [Kconfig condition documentation](https://docs.espressif.com/projects/idf-component-manager/en/latest/reference/manifest_file.html#kconfig-options).
+
+## Compatibility ranges and revisit conditions
+
+- Example 04 deliberately uses separate hosted-Wi-Fi ranges. ESP-IDF 6 uses
+  `esp_wifi_remote >=1.6,<2.0` with `esp_hosted >=2.12,<3.0`; ESP-IDF 5.5 uses
+  `esp_wifi_remote 0.14.*` with `esp_hosted 1.4.*`. Revisit these ranges only
+  when the exact ESP32-C6 image or source revision is recorded and both ESP-IDF
+  lines pass build and hardware-in-the-loop checks.
+- Example 09 keeps `esp_video ~2.0`. Move that range only after the camera and
+  display pipeline builds on both ESP-IDF lines and passes hardware validation.
+- Example 08 accepts LVGL v9 with `^9.*`; example 12 and the Brookesia surfaces
+  use LVGL `9.5.0`. Move these contracts only after compile, UI, display and
+  touch regression checks on both display variants.
+- The maintained firmware's broad wildcard dependencies are resolver-tracking
+  source-build inputs, not reproducible release pins. Before publishing any
+  delivery artifact, record the resolved versions and checksums and validate
+  both `rev1_3` and `rev3_x` firmware profiles.
 
 ## Product-local or example-local components
 

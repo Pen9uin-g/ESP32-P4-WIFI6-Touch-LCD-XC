@@ -15,7 +15,7 @@ CSI、3.4/4 英寸显示屏连接器、Codec/ADC、麦克风、扬声器功放�
 
 | 范围 | 仓库证据 |
 | --- | --- |
-| ESP-IDF 板级支持 | `examples/esp-idf/*/components/waveshare__esp32_p4_wifi6_touch_lcd_xc/` 及其中的 `idf_component.yml` |
+| ESP-IDF 板级支持 | `examples/esp-idf/07_Displaycolorbar/main/idf_component.yml`、`examples/esp-idf/08_lvgl_demo_v9/components/bsp_extra/idf_component.yml` 和 `firmware/brookesia/components/bsp_extra/idf_component.yml` 等依赖 manifest 将托管的 `waveshare/esp32_p4_wifi6_touch_lcd_xc` BSP 固定为 `3.0.1`；其源码由 Component Manager 解析，不在本仓库 vendoring |
 | 显示屏变体 | BSP 头文件和 `BSP_LCD_TYPE_800_800_3_4_INCH` / `BSP_LCD_TYPE_720_720_4_INCH` 配置 |
 | Arduino 显示变体 | `examples/arduino/libraries/displays/displays_config.h` 和一方示例中的 `CURRENT_SCREEN` |
 | Arduino I2C/触控 | `examples/arduino/libraries/displays/i2c.h` 和 `gt911.h` |
@@ -23,7 +23,19 @@ CSI、3.4/4 英寸显示屏连接器、Codec/ADC、麦克风、扬声器功放�
 | Hosted Wi-Fi | `examples/esp-idf/04_wifistation/main/idf_component.yml` |
 
 示例使用 GT911 兼容触控 API。本文档不重复维护完整引脚表；如果修改开发板
-相关内容，应同时更新和核对原理图、BSP 头文件及 Arduino 配置。
+相关内容，应同时更新和核对原理图、托管 BSP 源码及 Arduino 配置。
+
+## 当前静态审计
+
+| 接口 | 静态约定与边界 |
+| --- | --- |
+| 显示 | 3.4C 使用 `BSP_LCD_TYPE_800_800_3_4_INCH`，4C 使用 `BSP_LCD_TYPE_720_720_4_INCH`；两者均使用 MIPI-DSI 显示路径。LCD 复位为 GPIO27，背光 PWM 为 GPIO26。 |
+| I2C | SDA 为 GPIO7，SCL 为 GPIO8。 |
+| 触控 | 官方控制器为 GT9271。`TP_RST`/`CTP_RESET` 经 0 欧 R62 连接到 GPIO23；`TP_INT`/`CTP_INT` 只连接到 TP2，没有 MCU 路由。托管 BSP 3.0.1 将复位和中断都设为 `GPIO_NUM_NC`：中断与该缺失路由一致，复位则与原理图不一致。 |
+| microSD | SD D0..D3 使用 GPIO39..GPIO42，CLK 为 GPIO43，CMD 为 GPIO44；与 BSP 约定一致。 |
+| 音频 | ES8311/ES7210 使用 I2S GPIO9..GPIO13，PA 使能为 GPIO53；与 BSP 约定一致。 |
+| 存储器 | ESP32-P4NRW32 具有 32 MB 封装内 PSRAM，GD25Q256 提供 32 MB Flash；与配置的存储 profile 一致。 |
+| 处理器、无线和版本 | 原理图标识了 ESP32-P4 和 ESP32-C6 的开发板设计，其开发板版本为 rev1.1。`rev1_3` 和 `rev3_x` 是 ESP32-P4 芯片兼容 profile，不是 PCB 版本；不要从这些 profile 推断开发板版本。 |
 
 ## 后续修改的审计规则
 
@@ -36,5 +48,6 @@ CSI、3.4/4 英寸显示屏连接器、Codec/ADC、麦克风、扬声器功放�
 4. 记录验证是静态的（源码/原理图）还是包含实体开发板测试。CI 通过只说明可以
    编译，不能单独证明引脚正确。
 
-当前仓库工作范围是文档和 CI，不会修改板级引脚定义或交付固件文件。未来涉及
-   引脚的改动仍需完成原理图交叉核对，并在条件允许时进行实体开发板测试。
+本 PR 将 vendored BSP 使用者迁移到托管的 `3.0.1`。已审计的显示、I2C、microSD、
+音频和存储器约定一致，触控复位则不一致。编译成功不等同于 HIL 验证；在依赖托管
+触控复位约定前，仍必须进行回归。

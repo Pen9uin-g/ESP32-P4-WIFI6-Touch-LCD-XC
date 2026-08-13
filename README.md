@@ -50,7 +50,7 @@ select the required model under **Version Options**.
 | Memory | 32 MB in-package PSRAM and 32 MB NOR Flash |
 | Wireless | ESP32-C6-MINI-1 over SDIO, providing 2.4 GHz Wi-Fi 6 and Bluetooth 5 (LE) |
 | Display | 2-lane MIPI-DSI round IPS LCD; 3.4-inch 800 × 800 or 4-inch 720 × 720 |
-| Touch | Capacitive touch interface; the examples use a GT911-compatible driver |
+| Touch | Official hardware uses a GT9271 capacitive-touch controller; the examples use a managed GT911-compatible driver/API |
 | Camera | 2-lane MIPI-CSI camera interface |
 | Audio | ES8311 audio codec, ES7210 audio ADC, onboard microphones, and an 8 Ω / 2 W speaker header |
 | Storage and USB | SDIO 3.0 microSD slot and USB 2.0 OTG High-Speed |

@@ -10,18 +10,18 @@ ESP32-P4-WIFI6-Touch-LCD-XC board.
 
 | Path | Area |
 | --- | --- |
-| `examples/esp-idf/01_HowToCreateProject` | Minimal ESP-IDF project layout |
-| `examples/esp-idf/02_HelloWorld` | Basic ESP-IDF application |
-| `examples/esp-idf/03_i2c_tools` | I2C scan and command tools |
-| `examples/esp-idf/04_wifistation` | Wi-Fi station connection |
-| `examples/esp-idf/05_sdmmc` | SD card and SDMMC |
-| `examples/esp-idf/06_I2SCodec` | I2S audio codec |
-| `examples/esp-idf/07_Displaycolorbar` | LCD display color bar |
-| `examples/esp-idf/08_lvgl_demo_v9` | LVGL v9 display demo |
-| `examples/esp-idf/09_video_lcd_display` | Video display pipeline |
-| `examples/esp-idf/10_mp4_player` | MP4/AVI playback |
-| `examples/esp-idf/11_esp_brookesia_phone` | ESP-Brookesia phone UI |
-| `examples/esp-idf/12_usb_extend_screen` | USB extended screen |
+| [`examples/esp-idf/01_HowToCreateProject`](esp-idf/01_HowToCreateProject/README.md) | Minimal ESP-IDF project layout |
+| [`examples/esp-idf/02_HelloWorld`](esp-idf/02_HelloWorld/README.md) | Basic ESP-IDF application |
+| [`examples/esp-idf/03_i2c_tools`](esp-idf/03_i2c_tools/README.md) | I2C scan and command tools |
+| [`examples/esp-idf/04_wifistation`](esp-idf/04_wifistation/README.md) | Wi-Fi station connection |
+| [`examples/esp-idf/05_sdmmc`](esp-idf/05_sdmmc/README.md) | SD card and SDMMC |
+| [`examples/esp-idf/06_I2SCodec`](esp-idf/06_I2SCodec/README.md) | I2S audio codec |
+| [`examples/esp-idf/07_Displaycolorbar`](esp-idf/07_Displaycolorbar/README.md) | LCD display color bar |
+| [`examples/esp-idf/08_lvgl_demo_v9`](esp-idf/08_lvgl_demo_v9/README.md) | LVGL v9 display demo |
+| [`examples/esp-idf/09_video_lcd_display`](esp-idf/09_video_lcd_display/README.md) | Video display pipeline |
+| [`examples/esp-idf/10_mp4_player`](esp-idf/10_mp4_player/README.md) | MP4/AVI playback |
+| [`examples/esp-idf/11_esp_brookesia_phone`](esp-idf/11_esp_brookesia_phone/README.md) | ESP-Brookesia phone UI |
+| [`examples/esp-idf/12_usb_extend_screen`](esp-idf/12_usb_extend_screen/README.md) | USB extended screen |
 
 ## Arduino
 

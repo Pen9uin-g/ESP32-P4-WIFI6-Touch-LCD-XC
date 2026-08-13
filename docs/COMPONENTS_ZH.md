@@ -12,9 +12,14 @@
 BSP，并精确固定为 `3.0.1`。示例中不再保留该 BSP 的 vendored 副本；`bsp_extra`
 和其他无关本地组件仍保持本地边界。
 
-官方 `3.0.1` BSP 将触控复位设为 `GPIO_NUM_NC`，而示例 08 和 09 之前的本地副本使用
-GPIO23。本次迁移不会凭空添加全局 GPIO 覆盖，因为原理图证据不足。受影响开发板必须
-进行真实硬件触控复位回归测试。
+原理图对触控信号给出了确切的静态约定：显示连接器的 `TP_RST`/`CTP_RESET` 通过
+0 欧 `R62` 连接到 GPIO23；`TP_INT`/`CTP_INT` 只连接到 `TP2` 测试点，没有 MCU
+路由。托管的 `3.0.1` BSP 将触控复位和中断都设为 `GPIO_NUM_NC`。中断选择与不存在
+MCU 路由一致；复位选择则与原理图不同。本次迁移不会凭空添加本地 GPIO 覆盖，也不会
+重新 vendoring 该组件。
+
+在变更产品依赖前，先在真实 3.4C 与 4C 开发板上验证触控工作，再取得对共享
+Waveshare 组件修正和发布的授权。在此之前，仍必须进行 HIL 回归。
 
 USB 扩展屏示例还把 `espressif/tinyusb` 精确固定为 `0.17.0~2`，这是现有
 `espressif/usb_device_uac` `1.2.0` 允许的精确版本。两者都使用精确版本，可避免
@@ -25,6 +30,21 @@ vendor-only 命令同时关闭该选项与 `CONFIG_UAC_AUDIO_ENABLE`，因此不
 Kconfig 的 manifest 条件要求 ESP-IDF 6.0，而本仓库还要验证 ESP-IDF 5.5；详情见
 Component Manager 的
 [Kconfig 条件说明](https://docs.espressif.com/projects/idf-component-manager/en/latest/reference/manifest_file.html#kconfig-options)。
+
+## 兼容版本范围与重访条件
+
+- 示例 04 有意为 Hosted Wi-Fi 使用两组版本范围。ESP-IDF 6 使用
+  `esp_wifi_remote >=1.6,<2.0` 与 `esp_hosted >=2.12,<3.0`；ESP-IDF 5.5
+  使用 `esp_wifi_remote 0.14.*` 与 `esp_hosted 1.4.*`。只有在记录准确的
+  ESP32-C6 镜像或源码 revision，并且两个 ESP-IDF 版本线都通过构建和 HIL
+  验证后，才重访这些范围。
+- 示例 09 保持 `esp_video ~2.0`。只有摄像头和显示链路在两个 ESP-IDF 版本线
+  均构建通过并完成硬件验证后，才调整该范围。
+- 示例 08 以 `^9.*` 接受 LVGL v9；示例 12 与 Brookesia 面使用 LVGL
+  `9.5.0`。只有两个显示变体都通过编译、UI、显示与触控回归后，才调整这些约定。
+- 维护固件中的宽泛通配依赖属于跟随解析器的源码构建输入，不是可复现的发布固定项。
+  发布任何交付物前，应记录解析后的版本与校验和，并验证 `rev1_3` 和 `rev3_x`
+  两个固件 profile。
 
 ## 产品或示例本地组件
 
