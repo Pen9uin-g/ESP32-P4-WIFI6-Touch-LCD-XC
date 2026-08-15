@@ -45,6 +45,7 @@ DISPLAY_BASE_DEFAULTS = {
 GLOBAL_BOTH_PATHS = {
     ".github/scripts/ci_change_router.py",
     ".github/scripts/package_build_artifact.py",
+    ".github/scripts/validate_flash_artifact.py",
 }
 FIRMWARE_GLOBAL_PATHS = {
     ".github/scripts/build_maintained_firmware.sh",
@@ -60,7 +61,7 @@ ARDUINO_GLOBAL_PATHS = {
     ".github/scripts/discover_arduino_sketches.py",
     ".github/workflows/arduino-projects.yml",
 }
-POLICY_PATHS = {
+NON_BUILD_PATHS = {
     ".gitignore",
     "LICENSE",
     "Flash-CI-Firmware.cmd",
@@ -71,7 +72,7 @@ POLICY_PATHS = {
     ".github/scripts/repo_self_check.py",
     "scripts/Flash-CI-Firmware.ps1",
 }
-POLICY_PREFIXES = (
+NON_BUILD_PREFIXES = (
     ".github/ISSUE_TEMPLATE/",
     ".github/PULL_REQUEST_TEMPLATE/",
     ".github/tests/",
@@ -220,16 +221,12 @@ def git_changes(base_ref: str | None, head_ref: str) -> list[Change]:
 
 
 def path_is_documentation(path: str) -> bool:
-    if path.lower().endswith(".md"):
-        return True
-    if path in POLICY_PATHS:
-        return True
-    if path.startswith(POLICY_PREFIXES):
-        return True
-    return path in {
+    return path.lower().endswith(".md")
+
+
+def path_is_non_build_policy(path: str) -> bool:
+    return path in NON_BUILD_PATHS or path.startswith(NON_BUILD_PREFIXES) or path in {
         ".github/CODEOWNERS",
-        ".github/pull_request_template.md",
-        ".github/pull_request_template_ZH.md",
     }
 
 
@@ -269,6 +266,8 @@ def route_changes(
                 firmware_selected = True
             continue
         if path_is_documentation(path):
+            continue
+        if path_is_non_build_policy(path):
             continue
         if path in GLOBAL_BOTH_PATHS:
             selected_idf.update(known_idf)

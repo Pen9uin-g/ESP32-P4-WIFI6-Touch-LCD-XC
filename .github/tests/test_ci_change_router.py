@@ -162,7 +162,7 @@ class RouterTests(unittest.TestCase):
             self.idf,
             self.arduino,
         )
-        self.assertTrue(route["docs_only"])
+        self.assertFalse(route["docs_only"])
         self.assertEqual([], route["idf_projects"])
         self.assertEqual([], route["arduino_sketches"])
         self.assertFalse(route["firmware_selected"])
@@ -227,6 +227,54 @@ class RouterTests(unittest.TestCase):
             ".github/scripts/package_build_artifact.py",
             audit_config["global_build_patterns"],
         )
+        self.assertIn(
+            ".github/scripts/validate_flash_artifact.py",
+            audit_config["global_build_patterns"],
+        )
+        self.assertNotIn(
+            ".github/workflows/maintained-firmware.yml",
+            audit_config["global_build_patterns"],
+        )
+        self.assertIn(
+            ".github/workflows/maintained-firmware.yml",
+            audit_config["ignore_build_patterns"],
+        )
+
+        for shared_packaging_input in (
+            ".github/scripts/package_build_artifact.py",
+            ".github/scripts/validate_flash_artifact.py",
+        ):
+            with self.subTest(shared_packaging_input=shared_packaging_input):
+                route = router.route_changes(
+                    [router.Change("M", (shared_packaging_input,))],
+                    self.idf,
+                    self.arduino,
+                )
+                self.assertEqual(40, len(router.idf_matrix(route["idf_projects"])["include"]))
+                self.assertEqual(
+                    10,
+                    len(router.arduino_matrix(route["arduino_sketches"])["include"]),
+                )
+                self.assertEqual(
+                    2,
+                    len(router.firmware_matrix(route["firmware_selected"])["include"]),
+                )
+                self.assertFalse(route["docs_only"])
+                self.assertEqual([], route["unknown_paths"])
+
+    def test_non_markdown_policy_and_test_changes_are_not_docs_only(self) -> None:
+        route = router.route_changes(
+            [
+                router.Change("M", (".github/tests/test_package_build_artifact.py",)),
+                router.Change("M", (".github/scripts/audit_markdown.py",)),
+            ],
+            self.idf,
+            self.arduino,
+        )
+        self.assertFalse(route["docs_only"])
+        self.assertEqual([], route["idf_projects"])
+        self.assertEqual([], route["arduino_sketches"])
+        self.assertEqual([], route["unknown_paths"])
 
     def test_rename_and_deletion_route_using_old_paths(self) -> None:
         project = "examples/esp-idf/03_i2c_tools"
@@ -392,6 +440,18 @@ class RouterTests(unittest.TestCase):
         self.assertIn("--strict-unknown", workflow)
         self.assertIn("python .github/scripts/audit_markdown.py .", workflow)
         self.assertIn('--base "${{ github.event.pull_request.base.sha }}"', workflow)
+        self.assertIn("--expect-docs-only", workflow)
+        self.assertIn("steps.route.outputs.docs_only == 'true'", workflow)
+        self.assertIn(
+            "if: github.event_name == 'pull_request' && "
+            "steps.route.outputs.docs_only == 'true'",
+            workflow,
+        )
+        self.assertIn(
+            "if: github.event_name == 'pull_request' && "
+            "steps.route.outputs.docs_only != 'true'",
+            workflow,
+        )
         self.assertIn("--config .github/scripts/markdown-audit-config.json", workflow)
 
 

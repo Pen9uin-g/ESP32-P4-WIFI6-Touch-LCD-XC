@@ -8,16 +8,17 @@
     ".github/scripts/repo_self_check.py",
     ".github/tests/**",
     "Flash-CI-Firmware.cmd",
+    ".github/scripts/build_maintained_firmware.sh",
+    ".github/workflows/maintained-firmware.yml",
     "assets/ESP32-P4-WIFI6-Touch-LCD-XC.jpg",
     "scripts/Flash-CI-Firmware.ps1",
     "**/__pycache__/**",
     "**/*.pyc"
   ],
   "global_build_patterns": [
-    ".github/scripts/build_maintained_firmware.sh",
     ".github/scripts/ci_change_router.py",
     ".github/scripts/package_build_artifact.py",
-    ".github/workflows/maintained-firmware.yml",
+    ".github/scripts/validate_flash_artifact.py",
     ".github/scripts/discover_arduino_sketches.py",
     ".github/scripts/discover_esp_idf_projects.py"
   ]
