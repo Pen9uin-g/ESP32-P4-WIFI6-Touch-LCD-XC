@@ -5,6 +5,7 @@
 #include <Arduino_GFX_Library.h>
 #include "displays_config.h"
 #include "WiFi.h"
+#include "serial_log.h"
 
 int16_t w, h, text_size, banner_height, graph_baseline, graph_height, channel_width, signal_width;
 
@@ -45,10 +46,8 @@ Arduino_DSI_Display *gfx = new Arduino_DSI_Display(
 
 void setup(void) {
 
-  Serial.begin(115200);
-  // Serial.setDebugOutput(true);
-  // while(!Serial);
-  Serial.println("Arduino_GFX Hello World example");
+  serial_log::begin(115200);
+  serial_log::println("Arduino_GFX Hello World example");
 
   // Init Display
   WiFi.mode(WIFI_STA);
@@ -61,7 +60,7 @@ void setup(void) {
 
   // Init Display
   if (!gfx->begin()) {
-    Serial.println("gfx->begin() failed!");
+    serial_log::println("gfx->begin() failed!");
   }
   w = gfx->width();
   h = gfx->height();

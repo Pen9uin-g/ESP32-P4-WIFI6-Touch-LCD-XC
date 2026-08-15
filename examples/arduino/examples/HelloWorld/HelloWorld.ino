@@ -4,6 +4,7 @@
 
 #include <Arduino_GFX_Library.h>
 #include "displays_config.h"
+#include "serial_log.h"
 
 #ifndef CURRENT_SCREEN
 #define CURRENT_SCREEN SCREEN_3INCH_4_DSI
@@ -30,14 +31,14 @@ Arduino_DSI_Display *gfx = new Arduino_DSI_Display(
 
 void setup(void) {
 
-  Serial.begin(115200);
-  Serial.println("Arduino_GFX Hello World example");
+  serial_log::begin(115200);
+  serial_log::println("Arduino_GFX Hello World example");
 
   delay(1000);
 
   // Init Display
   if (!gfx->begin()) {
-    Serial.println("gfx->begin() failed!");
+    serial_log::println("gfx->begin() failed!");
   }
   gfx->fillScreen(RGB565_BLACK);
 

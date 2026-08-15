@@ -7,6 +7,7 @@
 #include "gt911.h"
 #include <lvgl.h>
 #include "lv_conf.h"
+#include "serial_log.h"
 #include <demos/lv_demos.h>
 
 static esp_lcd_touch_handle_t tp_handle = NULL;
@@ -49,7 +50,7 @@ static uint8_t touch_cnt = 0;
 static bool touch_pressed = false;
 
 static void haltWithError(const char *message) {
-  Serial.println(message);
+  serial_log::println(message);
   while (true) {
     delay(1000);
   }
@@ -82,8 +83,8 @@ void lvglTick(void *param) {
 }
 
 void setup(void) {
-  Serial.begin(115200);
-  Serial.println("Arduino GFX + LVGL Integration");
+  serial_log::begin(115200);
+  serial_log::println("Arduino GFX + LVGL Integration");
 
   delay(1000);
 
@@ -145,7 +146,7 @@ void setup(void) {
   //   lv_demo_music();
   // lv_demo_stress();
 
-  Serial.println("Setup complete");
+  serial_log::println("Setup complete");
 }
 
 void loop() {

@@ -5,6 +5,7 @@
 #include <Arduino_GFX_Library.h>
 #include "displays_config.h"
 #include "gt911.h"
+#include "serial_log.h"
 
 static esp_lcd_touch_handle_t tp_handle = NULL;
 #define MAX_TOUCH_POINTS 5
@@ -39,8 +40,8 @@ Arduino_DSI_Display *gfx = new Arduino_DSI_Display(
 
 void setup(void) {
 
-  Serial.begin(115200);
-  Serial.println("Arduino_GFX Hello World example");
+  serial_log::begin(115200);
+  serial_log::println("Arduino_GFX Hello World example");
 
   delay(1000);
 
@@ -49,7 +50,7 @@ void setup(void) {
   tp_handle = touch_gt911_init(port);
 
   if (!gfx->begin()) {
-    Serial.println("gfx->begin() failed!");
+    serial_log::println("gfx->begin() failed!");
   }
 
 
