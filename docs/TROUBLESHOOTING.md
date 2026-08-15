@@ -17,7 +17,13 @@ Use this checklist when an example does not build, flash, or run as expected.
 
 ## Flash And Monitor Issues
 
-- Verify the USB-UART port and use it with `idf.py -p PORT flash monitor`.
+- For ESP-IDF, verify the Type-C UART/USB-UART port and use it with
+  `idf.py -p PORT flash monitor`.
+- For the tested Arduino FQBN, sketch `Serial` uses Hardware CDC on Type-C USB,
+  not the CH343P Type-C UART port. See
+  [Arduino segmented flashing](ARDUINO_FLASHING.md).
+- An Arduino sketch must start with the monitor closed or disconnected. Missing
+  startup lines are expected when the non-blocking logger drops them.
 - Hold or press the board boot/reset controls only when the serial tool cannot
   enter download mode automatically.
 - Try a data-capable USB-C cable and a direct USB port on the host.

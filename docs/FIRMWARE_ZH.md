@@ -38,6 +38,35 @@ Flash-CI-Firmware.cmd -Port COMx
 
 前两个命令是离线本地检查：不会访问 GitHub、串口硬件或烧录设备。正常模式必须提供
 `-Port COMx`；GUI 会显示这个显式端口，并在写入前再次要求确认。GUI 从不擦除 flash，
+对于 Arduino 条目，下载器只接受一个 schema 3 分段 ZIP。它会先拒绝不安全、重复、
+冲突或链接条目，再安全展开 ZIP，并核验 `SHA256SUMS` 覆盖的精确文件集合。manifest、
+规范化 `flash_args`、分段大小与哈希、Flash 容量、FQBN、产品 SHA，以及 reference-only
+BSP 的版本、来源 SHA、source tree 和 component tree pin，都必须与所选 exact-HEAD
+工作流身份完全一致。CI 生产端和验证器还会从该产品 SHA 的干净 source worktree
+重新计算规范化 build identity：仓库相对 project 和已跟踪主 sketch、真实
+`sketchLocation`、生成的 translation unit/object、编译 FQBN、USB/屏幕宏、source
+include 与 application 分段必须彼此一致。原始 `build.options.json` 和
+`compile_commands.json` 不进入 ZIP，只公开原文件名、大小和 SHA-256。merged 和
+whole-flash 镜像会被拒绝。真实多段计划中的 bootloader 可以位于 `0x0`；
+位于 `0x0` 的单文件计划会被拒绝。包内容与手工命令见
+[Arduino 分段烧录指南](ARDUINO_FLASHING_ZH.md)。
+
+打包器和验证器都会从自身已检入脚本的位置推导 trusted repository root；
+`--source-root` 必须解析到同一个 Git 顶层 worktree（工作流传入自身的
+`GITHUB_WORKSPACE`）。因此，即使另一个 checkout 自报的 SHA 与构建元数据彼此一致，
+来自本 checkout 的脚本也会拒绝它。
+
+Schema 3 ZIP 条目使用固定时间戳，manifest 不含墙上时钟生成字段，因此对同一组已
+验证输入重复打包会得到逐字节一致的 ZIP。打包回归套件还会分别对 `flash.sh` 和
+`flash.bat` 执行五种独立篡改：删除 helper 成员、删除一个分段对、修改 offset、修改
+文件名及修改 flash option。即使重新计算 checksum 元数据，这十个 ZIP 负例也都必须
+被验证器拒绝。
+
+`-SelfTest` 还会在本地临时生成 schema 3 测试包和 ZIP，覆盖合法的 `0x0` 多段场景，
+并检查 BSP、规范化 build identity、checksum、whole-flash、路径穿越、重复 ZIP
+条目和符号链接等反例；整个过程不使用网络或串口设备。
+
+GUI 从不擦除 flash，
 并将精确 SHA、人工 PASS 进度、所选端口和日志保存到当前用户的本地应用数据目录；
 已验证写入状态不会跨会话保存。
 成功的 CI 产物及 `Hash of data verified` 并不能证明显示、触摸、音频、USB 或其他硬件

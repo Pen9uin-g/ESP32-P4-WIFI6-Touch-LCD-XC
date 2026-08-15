@@ -160,6 +160,7 @@ discovery. See [Continuous Integration](docs/CI.md) for exact behavior.
 - [Official Product Documentation](https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-XC)
 - [Official Chinese Product Documentation](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-XC/)
 - [Getting Started](docs/GETTING_STARTED.md)
+- [Arduino Segmented Flashing and Hardware CDC](docs/ARDUINO_FLASHING.md)
 - [Examples Guide](examples/README.md)
 - [Project Structure](docs/PROJECT_STRUCTURE.md)
 - [Continuous Integration](docs/CI.md)

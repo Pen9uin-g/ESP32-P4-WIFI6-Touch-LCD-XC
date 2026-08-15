@@ -4,14 +4,11 @@
 
 ## Arduino-ESP32 core
 
-### 最新稳定版本
+### CI 已验证稳定版本
 
-[![Release Version](https://img.shields.io/github/release/espressif/arduino-esp32.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
-[![Release Date](https://img.shields.io/github/release-date/espressif/arduino-esp32.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
-[![Downloads](https://img.shields.io/github/downloads/espressif/arduino-esp32/latest/total.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
-
-本地实验建议使用 Arduino-ESP32 的最新稳定版本。仓库 CI 使用的固定版本记录
-在下方；只有兼容性矩阵确认后才会更新该版本。
+本仓库固定使用
+[Arduino-ESP32 3.3.11](https://github.com/espressif/arduino-esp32/releases/tag/3.3.11)。
+复现 CI 与烧录包时请使用该精确版本；更高版本需单独验证后才能修改兼容性矩阵。
 
 ### CI 测试配置
 
@@ -25,6 +22,16 @@ esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,
 该配置选择 pre-v3 ESP32-P4 silicon，启用板载 32 MB PSRAM 和 32 MB Flash，
 并为图形示例提供 13 MB 应用分区。
 
+### USB 接口与非阻塞日志
+
+CI FQBN 选择 `USBMode=hwcdc,CDCOnBoot=cdc`，因此示例的 `Serial` 日志通过
+开发板的 **Type-C USB** 接口和 ESP32-P4 Hardware USB Serial/JTAG CDC 输出。
+另一个 **Type-C UART** 接口通过 CH343P USB 转串口芯片连接 UART0；受支持的
+上传流程可使用它，但在当前 CI FQBN 下，该接口不会收到示例的 `Serial` 日志。
+
+一方示例不会等待串口监视器。Hardware CDC 未连接或主机未及时读取时，诊断
+日志会被丢弃，显示、触控及应用启动不会因此延迟。
+
 每个示例都会为两种产品显示屏编译：
 
 | 产品 | CI 定义 |
@@ -34,7 +41,10 @@ esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,
 
 ### 文档
 
-请参阅 [Arduino-ESP32 在线文档](https://docs.espressif.com/projects/arduino-esp32/en/latest/)。
+分段烧录、接口选择和 HIL 检查请参阅
+[Arduino 分段烧录与 Hardware CDC 验证](../../docs/ARDUINO_FLASHING_ZH.md)。
+[Arduino-ESP32 文档](https://docs.espressif.com/projects/arduino-esp32/en/latest/)
+当前说明的是仓库固定使用的 `3.3.11` core。
 
 ## 其他依赖
 

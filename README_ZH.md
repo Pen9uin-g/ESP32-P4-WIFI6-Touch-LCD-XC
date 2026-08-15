@@ -145,6 +145,7 @@ idf.py -p PORT flash monitor
 - [官方中文产品文档](https://docs.waveshare.net/ESP32-P4-WIFI6-Touch-LCD-XC/)
 - [官方英文产品文档](https://docs.waveshare.com/ESP32-P4-WIFI6-Touch-LCD-XC)
 - [入门指南](docs/GETTING_STARTED_ZH.md)
+- [Arduino 分段烧录与 Hardware CDC](docs/ARDUINO_FLASHING_ZH.md)
 - [示例索引](examples/README_ZH.md)
 - [工程结构](docs/PROJECT_STRUCTURE_ZH.md)
 - [持续集成](docs/CI_ZH.md)

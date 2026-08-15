@@ -4,15 +4,12 @@
 
 ## Arduino-ESP32 core
 
-### Latest Stable Release:
+### CI-tested stable release
 
-[![Release Version](https://img.shields.io/github/release/espressif/arduino-esp32.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
-[![Release Date](https://img.shields.io/github/release-date/espressif/arduino-esp32.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
-[![Downloads](https://img.shields.io/github/downloads/espressif/arduino-esp32/latest/total.svg)](https://github.com/espressif/arduino-esp32/releases/latest/)
-
-Use the latest stable Arduino-ESP32 release for local experiments. The
-repository CI pin is recorded above and is updated deliberately when the
-compatibility matrix changes.
+[Arduino-ESP32 3.3.11](https://github.com/espressif/arduino-esp32/releases/tag/3.3.11)
+is the exact release used by this repository. Use that version to reproduce CI
+and flash-package results; evaluate later releases separately before changing
+the compatibility matrix.
 
 ### CI-Tested Configuration
 
@@ -27,6 +24,18 @@ This selects pre-v3 ESP32-P4 silicon at the board-supported frequency, enables
 the onboard 32 MB PSRAM and 32 MB flash, and provides a 13 MB application
 partition for the larger graphics examples.
 
+### USB ports and non-blocking logs
+
+The CI FQBN selects `USBMode=hwcdc,CDCOnBoot=cdc`. Consequently, sketch
+`Serial` output uses the ESP32-P4 Hardware USB Serial/JTAG CDC interface on the
+board's **Type-C USB** connector. The separate **Type-C UART** connector passes
+through the CH343P USB-to-UART bridge to UART0 and can be used by supported
+upload flows, but it does not carry these sketch logs under the CI FQBN.
+
+First-party sketches never wait for a serial monitor. If Hardware CDC is not
+connected or the host is not accepting data, diagnostic lines are dropped
+without delaying display, touch, or application startup.
+
 Every sketch is compiled for both product displays:
 
 | Product | CI definition |
@@ -36,7 +45,10 @@ Every sketch is compiled for both product displays:
 
 ### Documentation
 
-You can use the [Arduino-ESP32 Online Documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/) to get all information about this project.
+See [segmented flashing and Hardware CDC validation](../../docs/ARDUINO_FLASHING.md)
+for package verification, flashing, connector selection, and the required HIL
+checks. The [Arduino-ESP32 documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/)
+currently describes the pinned `3.3.11` core.
 
 ## Other Dependencies
 

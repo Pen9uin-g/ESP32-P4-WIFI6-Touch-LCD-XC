@@ -119,15 +119,34 @@ Manual runs accept `sketch=all`, a sketch name, or a full sketch path.
 
 After a successful product build, Actions uploads one artifact named with its
 project/sketch, variant, configuration, framework and short exact SHA. Download
-it from the workflow run's **Artifacts** section. It contains only generated
-first-party example outputs: `manifest.json`, `SHA256SUMS`, `flash.sh`,
-`flash.bat`, safe-path `bin/` files referenced by the framework flash plan, and
-available ELF/map/sdkconfig debug files. Arduino packages also retain
-`merged.bin` when the core generated it.
+it from the workflow run's **Artifacts** section. The validated contents include
+`manifest.json`, `SHA256SUMS`, `flash.sh`, `flash.bat`, safe-path `bin/` files
+referenced by the framework flash plan, and framework-appropriate diagnostics.
 
-The manifest records the full commit SHA, target, display/resolution,
-configuration, framework, flash settings and ordered offsets. The flash helpers
-require a port and accept an optional baud rate; they do not erase flash.
+Arduino packaging reads `flash_args` and `build.options.json` from the complete
+Arduino CLI `3.3.11` build directory. It publishes only the individual segments
+named by that exact flash plan; it neither guesses offsets nor derives payloads
+from a merged image. A deterministic ZIP is reopened and checked against the
+validated directory. CI fails on unsafe or duplicate paths, symlinks, metadata
+or payload hash/size mismatches, overlapping or out-of-capacity segments,
+unexpected FQBN/core values, and merged or whole-flash images.
+
+Arduino ZIPs exclude raw build options, expanded properties, ELF/map debug
+metadata and other host-specific records. Only the validated FQBN/core identity
+and the original build-options filename, size and SHA-256 are recorded.
+Validation re-hashes the original file from the private build directory and
+rejects public metadata containing usernames, absolute work paths or tool-cache
+paths.
+
+The manifest records the full product commit SHA, target, FQBN,
+display/resolution, configuration, framework, flash size and settings, ordered
+segment offsets/sizes/hashes, `segmented_payload_total`, a copyable segmented
+command, and exact BSP source/version/tree pins. Arduino records the BSP as a
+reference-only checkpoint because the sketches do not link the managed ESP-IDF
+BSP. The flash helpers require a port and accept an optional baud rate; they do
+not erase flash or write a padded whole-flash image. See
+[Arduino segmented flashing](ARDUINO_FLASHING.md) for verification and HIL.
+
 Artifacts are example-build diagnostics, not hardware validation or factory
 firmware. Releases remain manual/deferred, and the separately maintained
 `firmware/` delivery surface remains separate.

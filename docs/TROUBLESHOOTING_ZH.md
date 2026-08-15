@@ -16,7 +16,13 @@
 
 ## 烧录与串口监视器问题
 
-- 确认 USB-UART 串口，并使用 `idf.py -p PORT flash monitor`。
+- 对 ESP-IDF，请确认 Type-C UART/USB-UART 串口，并使用
+  `idf.py -p PORT flash monitor`。
+- 对已测试 Arduino FQBN，示例 `Serial` 通过 Type-C USB 的 Hardware CDC
+  输出，不经过 CH343P Type-C UART 接口。请参阅
+  [Arduino 分段烧录](ARDUINO_FLASHING_ZH.md)。
+- Arduino 示例必须能在监视器关闭或断开时启动。非阻塞日志封装丢弃启动日志属于
+  预期行为。
 - 只有在串口工具无法自动进入下载模式时，才按住或按下开发板的启动/复位控制。
 - 更换支持数据传输的 USB-C 线缆，并尝试主机上的直连接口。
 - 确认开发板已供电并打开电源开关。

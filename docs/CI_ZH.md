@@ -105,12 +105,27 @@ UAC 音频，并在依赖解析阶段省略托管 UAC 组件。
 ## 可下载示例构建产物
 
 产品构建成功后，Actions 会上传一个以工程/示例、显示变体、配置、框架和精确提交
-短 SHA 命名的构建产物。可在工作流运行的 **Artifacts** 区域下载。产物仅含一方示例
-生成输出：`manifest.json`、`SHA256SUMS`、`flash.sh`、`flash.bat`、由框架烧录计划
-引用且保持安全相对路径的 `bin/` 文件，以及存在时的 ELF/map/sdkconfig 调试文件。
-Arduino 核生成 `merged.bin` 时也会保留该文件。
+短 SHA 命名的构建产物。可在工作流运行的 **Artifacts** 区域下载。通过验证的内容
+包括 `manifest.json`、`SHA256SUMS`、`flash.sh`、`flash.bat`、由框架烧录计划引用
+且保持安全相对路径的 `bin/` 文件，以及适合相应框架的诊断文件。
 
-manifest 会记录完整提交 SHA、目标、显示/分辨率、配置、框架、烧录设置和有序偏移。
-烧录辅助脚本需要端口参数，可选波特率参数，且不会擦除 Flash。它们是示例构建诊断
-产物，不代表硬件验证或工厂固件；Release 仍为手动/延后流程，单独维护的
-`firmware/` 交付面保持独立。
+Arduino 打包器从完整 Arduino CLI `3.3.11` 构建目录读取 `flash_args` 和
+`build.options.json`，只发布该次真实烧录计划列出的独立分段；不会猜测 offset，也
+不会从 merged 镜像切分载荷。生成的确定性 ZIP 会被重新打开并与已验证目录核对。
+路径不安全或重复、符号链接、元数据或载荷哈希/大小不符、分段重叠或越界、FQBN/core
+不符合预期，以及 merged 或 whole-flash 镜像都会使 CI 失败。
+
+Arduino ZIP 不包含原始 build options、expanded properties、ELF/map 调试元数据或
+其他主机相关记录。公开内容只有经验证的 FQBN/core 身份，以及原始 build-options
+的文件名、大小和 SHA-256。验证器会从私有构建目录重新计算原文件哈希，并拒绝公开
+元数据中的用户名、绝对工作路径或工具缓存路径。
+
+manifest 会记录完整产品提交 SHA、目标、FQBN、显示/分辨率、配置、框架、Flash
+大小和设置、有序分段的 offset/size/hash、`segmented_payload_total`、可复制的分段
+命令，以及精确 BSP 来源/版本/tree pin。Arduino 示例不链接 ESP-IDF managed BSP，
+因此 BSP 被记录为 reference-only 检查点。烧录辅助脚本需要端口参数，可选波特率
+参数，不会擦除 Flash，也不会写入填充后的整片镜像。验证与 HIL 步骤请参阅
+[Arduino 分段烧录](ARDUINO_FLASHING_ZH.md)。
+
+这些文件是示例构建诊断产物，不代表硬件验证或工厂固件；Release 仍为手动/延后
+流程，单独维护的 `firmware/` 交付面保持独立。

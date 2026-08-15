@@ -44,6 +44,43 @@ Flash-CI-Firmware.cmd -Port COMx
 The first two commands are offline local checks: they do not contact GitHub,
 inspect serial hardware, or flash a device. Normal mode requires `-Port COMx`;
 the GUI displays that explicit port and asks for confirmation before writing.
+For Arduino entries, the downloader requires exactly one schema-3 segmented ZIP.
+It safely expands that ZIP only after rejecting unsafe, duplicate, colliding, or
+linked entries, then verifies the exact `SHA256SUMS` file set. The manifest,
+canonical `flash_args`, segment sizes and hashes, Flash capacity, FQBN, product
+SHA, and reference-only BSP version/source/tree/component-tree pins must all
+match the selected exact-HEAD workflow identity. The CI producer and validator
+also recompute a canonical build identity from a clean source worktree at that
+product SHA: the repository-relative project and tracked primary sketch, actual
+`sketchLocation`, generated translation unit and object, compile FQBN/USB/screen
+definitions, source include, and application segment must agree. Raw
+`build.options.json` and `compile_commands.json` stay outside the ZIP; only their
+basenames, sizes, and SHA-256 digests are published. Merged and whole-flash
+images are rejected. A
+bootloader at offset `0x0` remains valid as part of a real multi-segment plan; a
+single-file plan at `0x0` is rejected. See the
+[Arduino segmented flashing guide](ARDUINO_FLASHING.md) for package contents and
+manual commands.
+
+The packager and validator each derive their trusted repository root from their
+own checked-in script location. `--source-root` must resolve to that same Git
+top-level worktree (the workflow passes its own `GITHUB_WORKSPACE`). A script
+from one checkout therefore rejects a different checkout even when the other
+checkout reports a self-consistent SHA and build metadata.
+
+Schema-3 ZIP entries use fixed timestamps and the manifest contains no
+wall-clock generation field, so packaging the same verified inputs twice is
+byte-for-byte reproducible. The package regression suite also rewrites a valid
+ZIP with five independent mutations for each helper (`flash.sh` and
+`flash.bat`): removing the helper, removing one segment pair, changing an
+offset, changing a filename, and changing a flash option. All ten cases must be
+rejected by the ZIP validator after checksum metadata is recomputed.
+
+`-SelfTest` also creates a temporary synthetic schema-3 package and ZIP locally.
+It checks the legal offset-`0x0` multi-segment case and negative BSP, canonical
+build-identity, checksum, whole-flash, traversal, duplicate-entry, and symlink
+cases without using the network or a serial device.
+
 The GUI never erases flash. It persists the exact SHA, manual PASS progress,
 selected port, and logs under the current user's local application-data
 directory; verified-write state does not carry across sessions. A successful CI artifact
