@@ -32,6 +32,7 @@ jobs:
         run: python .github/scripts/repo_self_check.py
 
       - name: Verify change routing is complete
+        id: route
         if: github.event_name != 'workflow_dispatch'
         shell: bash
         run: |
@@ -54,10 +55,18 @@ jobs:
           fi
 
       - name: Audit changed Markdown on pull requests
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.route.outputs.docs_only != 'true'
         run: >-
           python .github/scripts/audit_markdown.py .
           --base "${{ github.event.pull_request.base.sha }}"
+          --config .github/scripts/markdown-audit-config.json
+
+      - name: Audit documentation-only pull requests
+        if: github.event_name == 'pull_request' && steps.route.outputs.docs_only == 'true'
+        run: >-
+          python .github/scripts/audit_markdown.py .
+          --base "${{ github.event.pull_request.base.sha }}"
+          --expect-docs-only
           --config .github/scripts/markdown-audit-config.json
 
       - name: Audit the repository Markdown inventory

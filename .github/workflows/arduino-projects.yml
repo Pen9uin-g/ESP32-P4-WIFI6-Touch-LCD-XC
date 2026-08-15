@@ -23,6 +23,11 @@ env:
   ARDUINO_CORE_VERSION: "3.3.11"
   ESP32_INDEX_URL: "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
   ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600"
+  BSP_REFERENCE_VERSION: "3.0.2"
+  BSP_REFERENCE_SOURCE_SHA: "a95610f6f324bb32b2cba4fa347cdf1b892187b0"
+  BSP_REFERENCE_SOURCE_TREE: "5f4f0f350d536005c078981a5452d24ac0098324"
+  BSP_REFERENCE_COMPONENT_TREE: "5743d069eb272fabc6b066c5fd0b871085d30575"
+  BSP_REFERENCE_RELATIONSHIP: "reference-only"
 
 jobs:
   discover:
@@ -146,17 +151,38 @@ jobs:
           git_sha="$(git rev-parse HEAD)"
           build_path="$RUNNER_TEMP/arduino-build/${{ matrix.sketch_name }}/${{ matrix.screen }}"
           output="$RUNNER_TEMP/example-artifacts/$ARTIFACT_KEY"
+          zip_output="$RUNNER_TEMP/example-artifacts/${ARTIFACT_KEY}.zip"
+          test "$BSP_REFERENCE_RELATIONSHIP" = "reference-only"
           python .github/scripts/package_build_artifact.py arduino \
             --build-dir "$build_path" --output-dir "$output" \
+            --zip-output "$zip_output" \
             --product-label "ESP32-P4-WIFI6-Touch-LCD-XC" --variant "${{ matrix.variant }}" \
             --variant-id "${{ matrix.variant_id }}" \
             --resolution "${{ matrix.resolution }}" --configuration "${{ matrix.configuration }}" \
             --framework-version "$ARDUINO_CORE_VERSION" --target esp32p4 \
             --project "${{ matrix.sketch }}" --sketch "${{ matrix.sketch_name }}" \
             --fqbn "$ARDUINO_FQBN" --profile-id "${{ matrix.profile_id }}" \
-            --build-options "$build_path/build.options.json" --git-sha "$git_sha"
+            --build-options "$build_path/build.options.json" \
+            --source-root "$GITHUB_WORKSPACE" --git-sha "$git_sha" \
+            --bsp-sha "$BSP_REFERENCE_SOURCE_SHA" \
+            --bsp-source-tree "$BSP_REFERENCE_SOURCE_TREE" \
+            --bsp-component-tree "$BSP_REFERENCE_COMPONENT_TREE" \
+            --bsp-version "$BSP_REFERENCE_VERSION"
+          validation_args=(
+            --target esp32p4 --product-sha "$git_sha"
+            --fqbn "$ARDUINO_FQBN" --framework-version "$ARDUINO_CORE_VERSION"
+            --bsp-sha "$BSP_REFERENCE_SOURCE_SHA"
+            --bsp-source-tree "$BSP_REFERENCE_SOURCE_TREE"
+            --bsp-component-tree "$BSP_REFERENCE_COMPONENT_TREE"
+            --bsp-version "$BSP_REFERENCE_VERSION" --bsp-linked false
+            --build-dir "$build_path" --build-options "$build_path/build.options.json"
+            --source-root "$GITHUB_WORKSPACE"
+          )
+          python .github/scripts/validate_flash_artifact.py "$output" "${validation_args[@]}"
+          python .github/scripts/validate_flash_artifact.py "$zip_output" \
+            --equivalent-directory "$output" "${validation_args[@]}"
           echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
-          echo "path=$output" >> "$GITHUB_OUTPUT"
+          echo "path=$zip_output" >> "$GITHUB_OUTPUT"
 
       - name: Upload flashable example artifact
         uses: actions/upload-artifact@v7
