@@ -91,6 +91,9 @@ void setup(void) {
   DEV_I2C_Port port = DEV_I2C_Init();
 
   tp_handle = touch_gt911_init(port);
+  if (!tp_handle) {
+    haltWithError("touch_gt911_init() failed!");
+  }
 
   if (!gfx->begin()) {
     haltWithError("gfx->begin() failed!");
