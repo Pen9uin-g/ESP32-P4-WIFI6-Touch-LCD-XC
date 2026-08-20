@@ -45,6 +45,7 @@ DISPLAY_BASE_DEFAULTS = {
 }
 
 GLOBAL_BOTH_PATHS = {
+    ".gitattributes",
     ".github/scripts/ci_change_router.py",
     ".github/scripts/package_build_artifact.py",
     ".github/scripts/validate_flash_artifact.py",

@@ -16,6 +16,7 @@
     "**/*.pyc"
   ],
   "global_build_patterns": [
+    ".gitattributes",
     ".github/scripts/ci_change_router.py",
     ".github/scripts/package_build_artifact.py",
     ".github/scripts/validate_flash_artifact.py",

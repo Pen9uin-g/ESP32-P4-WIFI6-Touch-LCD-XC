@@ -235,6 +235,10 @@ class RouterTests(unittest.TestCase):
             ".github/scripts/validate_flash_artifact.py",
             audit_config["global_build_patterns"],
         )
+        self.assertIn(
+            ".gitattributes",
+            audit_config["global_build_patterns"],
+        )
         self.assertNotIn(
             ".github/workflows/maintained-firmware.yml",
             audit_config["global_build_patterns"],
@@ -245,6 +249,7 @@ class RouterTests(unittest.TestCase):
         )
 
         for shared_packaging_input in (
+            ".gitattributes",
             ".github/scripts/package_build_artifact.py",
             ".github/scripts/validate_flash_artifact.py",
         ):
