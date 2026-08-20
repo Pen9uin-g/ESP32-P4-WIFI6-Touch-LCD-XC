@@ -38,12 +38,16 @@ class RouterTests(unittest.TestCase):
         os.chdir(cls.previous_cwd)
 
     def test_inventory_and_complete_matrix_sizes(self) -> None:
+        self.assertEqual("rev3_x", router.DEFAULT_PROFILE_ID)
         self.assertEqual(12, len(self.idf))
         self.assertEqual(5, len(self.arduino))
         matrix = router.idf_matrix(sorted(self.idf))["include"]
         self.assertEqual(40, len(matrix))
-        self.assertEqual(10, len(router.arduino_matrix(sorted(self.arduino))["include"]))
+        arduino_matrix = router.arduino_matrix(sorted(self.arduino))["include"]
+        self.assertEqual(10, len(arduino_matrix))
         self.assertEqual(40, len({entry["artifact_key"] for entry in matrix}))
+        self.assertEqual({"rev3_x"}, {entry["profile_id"] for entry in matrix})
+        self.assertEqual({"rev3_x"}, {entry["profile_id"] for entry in arduino_matrix})
         self.assertEqual({"3.4C", "4C"}, {entry["variant"] for entry in matrix if entry["project"] in router.DISPLAY_PROJECTS})
         self.assertEqual({"3_4c", "4c"}, {entry["variant_id"] for entry in matrix if entry["project"] in router.DISPLAY_PROJECTS})
         self.assertTrue(all(entry["artifact_key"].startswith("xc-") for entry in matrix))

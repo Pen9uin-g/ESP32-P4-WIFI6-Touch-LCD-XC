@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -17,18 +18,38 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE_SCRIPT = ROOT / ".github" / "scripts" / "package_build_artifact.py"
 VALIDATOR_SCRIPT = ROOT / ".github" / "scripts" / "validate_flash_artifact.py"
-BSP_SHA = "a95610f6f324bb32b2cba4fa347cdf1b892187b0"
-BSP_SOURCE_TREE = "5f4f0f350d536005c078981a5452d24ac0098324"
-BSP_COMPONENT_TREE = "5743d069eb272fabc6b066c5fd0b871085d30575"
-BSP_VERSION = "3.0.2"
+BSP_SHA = "bfeb6e6d5737178cdde78b630c8118074da0a657"
+BSP_SOURCE_TREE = "7c12c7115599b4bb84072ad9ea68cc8c3e81b9c6"
+BSP_COMPONENT_TREE = "eff6286f5bb97145fb43a33102b9dafdfa5f5c0b"
+BSP_VERSION = "3.0.1"
 FQBN = (
-    "esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,"
+    "esp32:esp32:esp32p4:ChipVariant=postv3,PSRAM=enabled,FlashSize=32M,"
     "FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,"
     "USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600"
 )
+LEGACY_FQBN = FQBN.replace("ChipVariant=postv3", "ChipVariant=prev3")
+PACKAGE_MODULE_SPEC = importlib.util.spec_from_file_location(
+    "package_build_artifact", PACKAGE_SCRIPT
+)
+if PACKAGE_MODULE_SPEC is None or PACKAGE_MODULE_SPEC.loader is None:
+    raise RuntimeError("unable to load package artifact module")
+PACKAGE_MODULE = importlib.util.module_from_spec(PACKAGE_MODULE_SPEC)
+PACKAGE_MODULE_SPEC.loader.exec_module(PACKAGE_MODULE)
 
 
 class ArtifactPackagingTests(unittest.TestCase):
+    def test_fqbn_parser_supports_explicit_legacy_profile(self) -> None:
+        self.assertEqual(
+            "prev3",
+            PACKAGE_MODULE.parse_fqbn_selections(LEGACY_FQBN, "rev1_3")["ChipVariant"],
+        )
+        self.assertEqual(
+            "postv3",
+            PACKAGE_MODULE.parse_fqbn_selections(FQBN, "rev3_x")["ChipVariant"],
+        )
+        with self.assertRaises(PACKAGE_MODULE.PackageError):
+            PACKAGE_MODULE.parse_fqbn_selections(LEGACY_FQBN, "rev3_x")
+
     @classmethod
     def create_source_repository(cls, root: Path, marker: str) -> str:
         for project, sketch in (("examples/test", "test"), ("examples/other", "other")):
@@ -182,7 +203,7 @@ class ArtifactPackagingTests(unittest.TestCase):
         *,
         zip_output: Path | None = None,
         artifact_kind: str = "ci-example",
-        profile_id: str = "rev1_3",
+        profile_id: str = "rev3_x",
         sdkconfig_extra: str = "",
         fqbn: str = FQBN,
         build_fqbn: str | None = None,
@@ -457,6 +478,7 @@ class ArtifactPackagingTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, result.stderr)
             manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(3, manifest["schema"])
+            self.assertEqual("rev3_x", manifest["profile_id"])
             self.assertEqual(self.product_sha, manifest["product_git_sha"])
             self.assertEqual(3, manifest["segment_count"])
             self.assertEqual(sum(item["size"] for item in manifest["files"]), manifest["segmented_payload_total"])

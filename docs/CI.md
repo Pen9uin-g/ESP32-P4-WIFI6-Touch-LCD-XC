@@ -71,8 +71,8 @@ fallback selects both complete product matrices.
 not treated as another example. When its route is selected, its dedicated
 workflow builds exactly two independent ESP-IDF `v5.5.5`, 32 MB P4 artifacts:
 3.4C-default `rev1_3` and `rev3_x`. The profiles are incompatible binaries;
-examples are not doubled and remain `rev1_3` only. The C6 Hosted image is a
-runtime dependency, not a C6 binary in these artifacts.
+the example matrix is not doubled and defaults to `rev3_x` only. The C6 Hosted
+image is a runtime dependency, not a C6 binary in these artifacts.
 
 ## ESP-IDF matrix
 
@@ -83,8 +83,14 @@ a direct child of `examples/esp-idf/`. Every selected project builds with:
 | --- | --- |
 | ESP-IDF | `v5.5.5`, `v6.0.2` |
 | Target | `esp32p4` |
-| Silicon profile | `rev1_3` / ESP32-P4 revision < 3.0 |
+| Silicon profile | `rev3_x` / ESP32-P4 revision >= 3.0 (default); `rev1_3` is an explicit compatibility overlay |
+| PSRAM | Where enabled, 250 MHz in the default `rev3_x` configuration and 200 MHz in the explicit `rev1_3` overlay |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
+
+For confirmed pre-v3 silicon, use an isolated build and append
+`sdkconfig.defaults.rev1_3` as the final `SDKCONFIG_DEFAULTS` layer. Projects 07
+and 12 must retain `sdkconfig.defaults.esp32p4` before that final profile layer.
+Do not reuse a generated `sdkconfig` or binary between the two profiles.
 
 The complete route contains 40 jobs: projects 01–06 use the shared/default
 configuration (6 × 2); display projects 07–11 build explicit 3.4C (800×800)
@@ -107,8 +113,8 @@ sketch builds for both displays:
 | Setting | Value |
 | --- | --- |
 | Arduino-ESP32 | `3.3.11` |
-| Board | Generic ESP32-P4, pre-v3 silicon, 32 MB flash, PSRAM enabled |
-| Silicon profile | `rev1_3` only; examples are not doubled for `rev3_x` |
+| Board | Generic ESP32-P4, post-v3 silicon, 32 MB flash, PSRAM enabled |
+| Silicon profile | `rev3_x` / `ChipVariant=postv3` only in CI; confirmed pre-v3 hardware can be built explicitly with `ChipVariant=prev3`, and examples are not doubled |
 | Display variants | 3.4C (`SCREEN_3INCH_4_DSI`), 4C (`SCREEN_4INCH_DSI`) |
 | Bundled libraries | `examples/arduino/libraries/` |
 

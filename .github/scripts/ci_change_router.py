@@ -22,7 +22,9 @@ IDF_ROOT = Path("examples/esp-idf")
 ARDUINO_ROOT = Path("examples/arduino/examples")
 ARDUINO_LIBRARY_ROOT = "examples/arduino/libraries"
 DEFAULT_IDF_VERSIONS = ("v5.5.5", "v6.0.2")
-DEFAULT_PROFILE_ID = "rev1_3"
+# Product examples target ESP32-P4 rev3.x by default.  The maintained-firmware
+# matrix retains both explicitly selectable silicon profiles below.
+DEFAULT_PROFILE_ID = "rev3_x"
 FIRMWARE_PROJECT = "firmware/brookesia"
 SCREEN_VARIANTS = (
     {"screen": "3.4C", "variant_id": "3_4c", "screen_define": "SCREEN_3INCH_4_DSI", "resolution": "800x800"},

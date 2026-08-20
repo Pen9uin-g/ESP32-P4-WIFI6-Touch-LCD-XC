@@ -255,7 +255,7 @@ def validate_global_bindings(manifest: dict[str, Any], args: argparse.Namespace)
         if any(not value for value in required_cli.values()):
             raise ValidationError("Arduino validation requires all expected FQBN/framework/BSP pins")
         try:
-            package_lib.parse_fqbn_selections(args.fqbn)
+            package_lib.parse_fqbn_selections(args.fqbn, "rev3_x")
         except package_lib.PackageError as exc:
             raise ValidationError(str(exc)) from exc
         if manifest.get("fqbn") != args.fqbn:
@@ -265,8 +265,8 @@ def validate_global_bindings(manifest: dict[str, Any], args: argparse.Namespace)
             raise ValidationError("manifest Arduino framework binding is invalid")
         if args.framework_version != package_lib.ARDUINO_CORE_VERSION:
             raise ValidationError("Arduino framework pin must be 3.3.11")
-        if manifest.get("profile_id") != "rev1_3":
-            raise ValidationError("Arduino artifact profile must be rev1_3")
+        if manifest.get("profile_id") != "rev3_x":
+            raise ValidationError("Arduino artifact profile must be rev3_x")
         expected_bsp = {
             "source_sha": args.bsp_sha,
             "source_tree": args.bsp_source_tree,
@@ -320,7 +320,7 @@ def validate_external_build_inputs(
         raise ValidationError("external Arduino flash_args is missing or unsafe")
     try:
         build_options_data = package_lib.parse_build_options(
-            build_options, "rev1_3", args.fqbn, args.framework_version
+            build_options, "rev3_x", args.fqbn, args.framework_version
         )
     except package_lib.PackageError as exc:
         raise ValidationError(str(exc)) from exc

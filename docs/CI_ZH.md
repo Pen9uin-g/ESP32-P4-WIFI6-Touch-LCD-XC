@@ -63,8 +63,8 @@ python .github/scripts/ci_change_router.py --base-ref <base-sha> --head-ref <hea
 
 `firmware/brookesia` 是单独维护的交付/源码面，不会被当作另一个示例。路由选中时，
 专用工作流只构建两个独立的 ESP-IDF `v5.5.5`、32 MB、P4 产物：默认 3.4C 的
-`rev1_3` 和 `rev3_x`。两者二进制不兼容；示例不会为 `rev3_x` 翻倍，仍只使用
-`rev1_3`。C6 Hosted 镜像是运行时依赖，不是这些产物内的 C6 二进制文件。
+`rev1_3` 和 `rev3_x`。两者二进制不兼容；示例不会为 `rev3_x` 翻倍，默认只使用
+`rev3_x`。C6 Hosted 镜像是运行时依赖，不是这些产物内的 C6 二进制文件。
 
 ## ESP-IDF 矩阵
 
@@ -75,8 +75,14 @@ python .github/scripts/ci_change_router.py --base-ref <base-sha> --head-ref <hea
 | --- | --- |
 | ESP-IDF | `v5.5.5`、`v6.0.2` |
 | Target | `esp32p4` |
-| Silicon profile | `rev1_3` / ESP32-P4 revision < 3.0 |
+| Silicon profile | `rev3_x` / ESP32-P4 revision >= 3.0（默认）；`rev1_3` 是显式兼容 overlay |
+| PSRAM | 启用时，默认 `rev3_x` 配置使用 250 MHz，显式 `rev1_3` overlay 使用 200 MHz |
 | GitHub Action | `espressif/esp-idf-ci-action@v1` |
+
+对于已确认的 pre-v3 芯片，应使用隔离构建，并把 `sdkconfig.defaults.rev1_3`
+作为最后一层 `SDKCONFIG_DEFAULTS`。工程 07 和 12 必须把
+`sdkconfig.defaults.esp32p4` 保留在最终 profile 层之前。不要在两个 profile 间复用
+生成的 `sdkconfig` 或二进制文件。
 
 完整路由包含 40 个任务：01–06 工程使用共享/default 配置（6 × 2）；07–11 显示
 工程显式构建 3.4C（800×800）和 4C（720×720）两种变体（5 × 2 × 2）；
@@ -94,8 +100,8 @@ UAC 音频，并在依赖解析阶段省略托管 UAC 组件。
 | 设置 | 值 |
 | --- | --- |
 | Arduino-ESP32 | `3.3.11` |
-| 开发板 | 通用 ESP32-P4、pre-v3 silicon、32 MB Flash、启用 PSRAM |
-| Silicon profile | 仅 `rev1_3`；示例不会因 `rev3_x` 翻倍 |
+| 开发板 | 通用 ESP32-P4、post-v3 silicon、32 MB Flash、启用 PSRAM |
+| Silicon profile | CI 仅使用 `rev3_x` / `ChipVariant=postv3`；已确认的 pre-v3 硬件可显式改用 `ChipVariant=prev3` 构建，示例不会翻倍 |
 | 显示变体 | 3.4C（`SCREEN_3INCH_4_DSI`）、4C（`SCREEN_4INCH_DSI`） |
 | 内置库 | `examples/arduino/libraries/` |
 

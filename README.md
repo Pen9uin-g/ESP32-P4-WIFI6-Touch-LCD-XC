@@ -67,11 +67,12 @@ instructions.
 CI tests every first-party ESP-IDF project with ESP-IDF `v5.5.5` and
 `v6.0.2`.
 
-All examples default to the `rev1_3` (pre-v3) ESP32-P4 profile. `rev1_3` and
-`rev3_x` binaries are incompatible; examples are not doubled. The matching
-Arduino FQBN uses `ChipVariant=prev3`; revision profiles are metadata, not
-additional example matrix axes. Binaries for another silicon profile are not
-interchangeable.
+All examples default to the `rev3_x` ESP32-P4 silicon profile. Where PSRAM is
+enabled, the default ESP-IDF configuration uses 250 MHz, and the matching Arduino FQBN uses
+`ChipVariant=postv3`. `rev1_3` is an explicit compatibility configuration for
+pre-v3 silicon and limits enabled PSRAM to 200 MHz; it is not a second default example
+matrix. `rev1_3` and `rev3_x` binaries are incompatible. These are silicon
+profiles, not PCB revisions, so neither identifies a board revision.
 
 ```bash
 cd examples/esp-idf/02_HelloWorld
@@ -131,7 +132,7 @@ platform guidance.
 | --- | --- |
 | Repository self-check | Documentation, project structure, and first-party sketch layout |
 | ESP-IDF | 12 first-party projects × ESP-IDF `v5.5.5`/`v6.0.2`: 01–06 each build one shared non-display configuration per ESP-IDF line (12 jobs), 07–11 build both 3.4C and 4C displays (20 jobs), and USB builds both displays with default and vendor-only configurations (8 jobs); 40 jobs on a complete route |
-| Arduino | 5 first-party `rev1_3` sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays (10 jobs) |
+| Arduino | 5 first-party `rev3_x` sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays (10 jobs) |
 | Maintained firmware | Two ESP-IDF `v5.5.5` P4-only artifacts for `firmware/brookesia`: `rev1_3` and `rev3_x`; 3.4C is the firmware default |
 
 Every pull request gets visible policy, ESP-IDF-routing, and Arduino-routing

@@ -88,8 +88,9 @@ and `Hash of data verified` prove neither display, touch, audio, USB, nor other
 hardware behavior; confirm each item manually before marking it PASS.
 
 Silicon revision selection cannot confirm PCB or electrical revision. Compile
-success, CI success, and a verified write do not replace HIL testing; in
-particular, the managed BSP touch-reset change requires a touch regression test.
+success, CI success, and a verified write do not replace HIL testing. Touch
+HIL still requires checking the responding `0x5D`/`0x14` address, coordinates,
+release events, and polling on real hardware.
 
 This checkout currently has no positively identified checked-in factory `.bin` or
 delivery `.zip` artifact under `firmware/`. Source and build instructions for a

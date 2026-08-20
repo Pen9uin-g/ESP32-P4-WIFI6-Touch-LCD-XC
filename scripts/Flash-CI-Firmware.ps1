@@ -78,7 +78,7 @@ function Get-ExpectedArduinoIdentity {
     foreach ($key in @('BSP_REFERENCE_SOURCE_SHA', 'BSP_REFERENCE_SOURCE_TREE', 'BSP_REFERENCE_COMPONENT_TREE')) {
         if ([string]$values[$key] -cnotmatch '^[0-9a-f]{40}$') { throw "Arduino workflow $key must be a lowercase full Git object ID." }
     }
-    if ([string]$values['ARDUINO_CORE_VERSION'] -ne '3.3.11' -or [string]$values['ARDUINO_FQBN'] -notmatch '^esp32:esp32:esp32p4:' -or [string]$values['BSP_REFERENCE_VERSION'] -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$' -or [string]$values['BSP_REFERENCE_RELATIONSHIP'] -ne 'reference-only') { throw 'Arduino workflow identity is outside the XC artifact contract.' }
+    if ([string]$values['ARDUINO_CORE_VERSION'] -ne '3.3.11' -or [string]$values['ARDUINO_FQBN'] -notmatch '^esp32:esp32:esp32p4:ChipVariant=postv3,' -or [string]$values['BSP_REFERENCE_VERSION'] -ne '3.0.1' -or [string]$values['BSP_REFERENCE_RELATIONSHIP'] -ne 'reference-only') { throw 'Arduino workflow identity is outside the XC rev3 artifact contract.' }
     return [pscustomobject]@{
         CoreVersion = [string]$values['ARDUINO_CORE_VERSION']
         Fqbn = [string]$values['ARDUINO_FQBN']
@@ -102,12 +102,12 @@ function Get-CiItems([string]$PythonExe) {
     $arduinoIdentity = Get-ExpectedArduinoIdentity
     $items = @(); $index = 1
     foreach ($entry in $idf) {
-        if ($entry.idf_version -notin @('v5.5.5', 'v6.0.2') -or $entry.variant_id -notin @('shared', '3_4c', '4c') -or $entry.configuration -notin @('default', 'vendor-only') -or $entry.profile_id -ne 'rev1_3' -or [string]$entry.artifact_key -notmatch 'rev1_3') { throw 'ESP-IDF router entry is outside the XC CI contract.' }
+        if ($entry.idf_version -notin @('v5.5.5', 'v6.0.2') -or $entry.variant_id -notin @('shared', '3_4c', '4c') -or $entry.configuration -notin @('default', 'vendor-only') -or $entry.profile_id -ne 'rev3_x' -or [string]$entry.artifact_key -notmatch 'rev3_x') { throw 'ESP-IDF router entry is outside the XC rev3 CI contract.' }
         $items += [pscustomobject]@{ Index = $index; Workflow = 'esp-idf-projects.yml'; ArtifactKey = [string]$entry.artifact_key; SourceType = 'esp-idf'; FrameworkName = 'ESP-IDF'; FrameworkVersion = [string]$entry.idf_version; Project = [string]$entry.project; Sketch = ''; Configuration = [string]$entry.configuration; VariantId = [string]$entry.variant_id; Variant = [string]$entry.variant; ProfileId = [string]$entry.profile_id; ArtifactKind = 'ci-example' }
         $index++
     }
     foreach ($entry in $arduino) {
-        if ($entry.variant_id -notin @('3_4c', '4c') -or $entry.configuration -ne 'default' -or $entry.profile_id -ne 'rev1_3' -or [string]$entry.artifact_key -notmatch 'rev1_3') { throw 'Arduino router entry is outside the XC CI contract.' }
+        if ($entry.variant_id -notin @('3_4c', '4c') -or $entry.configuration -ne 'default' -or $entry.profile_id -ne 'rev3_x' -or [string]$entry.artifact_key -notmatch 'rev3_x') { throw 'Arduino router entry is outside the XC rev3 CI contract.' }
         $items += [pscustomobject]@{ Index = $index; Workflow = 'arduino-projects.yml'; ArtifactKey = [string]$entry.artifact_key; SourceType = 'arduino'; FrameworkName = 'Arduino-ESP32'; FrameworkVersion = $arduinoIdentity.CoreVersion; Project = [string]$entry.sketch; Sketch = [string]$entry.sketch_name; Configuration = [string]$entry.configuration; VariantId = [string]$entry.variant_id; Variant = [string]$entry.variant; Resolution = [string]$entry.resolution; ProfileId = [string]$entry.profile_id; ArtifactKind = 'ci-example'; Fqbn = $arduinoIdentity.Fqbn; BspVersion = $arduinoIdentity.BspVersion; BspSourceSha = $arduinoIdentity.BspSourceSha; BspSourceTree = $arduinoIdentity.BspSourceTree; BspComponentTree = $arduinoIdentity.BspComponentTree; BspRelationship = $arduinoIdentity.BspRelationship }
         $index++
     }
@@ -324,9 +324,9 @@ function Get-ESP32P4SiliconProfile([string]$PythonExe, [string]$SelectedPort) {
 function Select-CompatibleItems($Items, [string]$ProfileId) {
     $selected = @($Items | Where-Object { $_.ProfileId -eq $ProfileId })
     if ($ProfileId -eq 'rev1_3') {
-        if ($selected.Count -ne 51 -or @($selected | Where-Object { $_.ProfileId -ne 'rev1_3' }).Count -ne 0) { throw 'Pre-v3 ESP32-P4 must select exactly the 50 example artifacts plus rev1_3 maintained firmware.' }
+        if ($selected.Count -ne 1 -or $selected[0].ArtifactKind -ne 'maintained-firmware') { throw 'Pre-v3 ESP32-P4 must select only the rev1_3 maintained-firmware artifact.' }
     } elseif ($ProfileId -eq 'rev3_x') {
-        if ($selected.Count -ne 1 -or $selected[0].ArtifactKind -ne 'maintained-firmware') { throw 'ESP32-P4 revision >= 3.0 must select only the rev3_x maintained-firmware artifact.' }
+        if ($selected.Count -ne 51 -or @($selected | Where-Object { $_.ArtifactKind -eq 'ci-example' }).Count -ne 50 -or @($selected | Where-Object { $_.ArtifactKind -eq 'maintained-firmware' }).Count -ne 1) { throw 'ESP32-P4 revision >= 3.0 must select the 50 rev3_x example artifacts plus rev3_x maintained firmware.' }
     } else { throw "Unsupported ESP32-P4 profile: $ProfileId" }
     $index = 1
     foreach ($item in $selected) { $item.Index = $index; $index++ }
@@ -458,7 +458,7 @@ function Test-PackageManifest([string]$PackageDir, $Item, [string]$FinalSha) {
         Assert-ExactPropertySet $manifest.framework @('name', 'version') 'Arduino framework metadata'
         Assert-ExactPropertySet $manifest.bsp @('source_sha', 'source_tree', 'component_tree', 'version', 'linked', 'relationship') 'Arduino BSP metadata'
         Assert-ExactPropertySet $manifest.flash_settings @('esptool_options') 'Arduino flash settings'
-        if ([string]$manifest.product_label -ne 'ESP32-P4-WIFI6-Touch-LCD-XC' -or [string]$manifest.resolution -ne $Item.Resolution -or [string]$manifest.scope -ne 'first-party example' -or [string]$manifest.sketch -ne $Item.Sketch -or [string]$manifest.profile_compatibility -ne 'ESP32-P4 silicon revision < 3.0') { throw 'Arduino manifest product metadata is outside the XC contract.' }
+        if ([string]$manifest.product_label -ne 'ESP32-P4-WIFI6-Touch-LCD-XC' -or [string]$manifest.resolution -ne $Item.Resolution -or [string]$manifest.scope -ne 'first-party example' -or [string]$manifest.sketch -ne $Item.Sketch -or [string]$manifest.profile_compatibility -ne 'ESP32-P4 silicon revision >= 3.0') { throw 'Arduino manifest product metadata is outside the XC rev3 contract.' }
         if ([string]$manifest.fqbn -ne $Item.Fqbn -or [string]$manifest.bsp_git_sha -cne $Item.BspSourceSha -or [string]$manifest.bsp_source_tree -cne $Item.BspSourceTree -or [string]$manifest.bsp_component_tree -cne $Item.BspComponentTree -or [string]$manifest.bsp_version -ne $Item.BspVersion -or $manifest.bsp_linked -isnot [bool] -or [bool]$manifest.bsp_linked -or [string]$manifest.bsp_relationship -ne $Item.BspRelationship) { throw 'Arduino manifest direct BSP or FQBN binding is inconsistent.' }
         if ([string]$manifest.bsp.source_sha -cne $Item.BspSourceSha -or [string]$manifest.bsp.source_tree -cne $Item.BspSourceTree -or [string]$manifest.bsp.component_tree -cne $Item.BspComponentTree -or [string]$manifest.bsp.version -ne $Item.BspVersion -or $manifest.bsp.linked -isnot [bool] -or [bool]$manifest.bsp.linked -or [string]$manifest.bsp.relationship -ne $Item.BspRelationship) { throw 'Arduino manifest nested BSP binding is inconsistent.' }
         if ($manifest.PSObject.Properties['merged_image'] -or $manifest.PSObject.Properties['original_flash_args'] -or @($manifest.debug_files).Count -ne 0 -or ($plan.Count -eq 1 -and $plan[0].Offset -eq 0) -or $payloadTotal -ge ($FlashLimit / 2)) { throw 'Arduino package contains a merged/debug/whole-flash path or is not a compact segmented payload.' }
@@ -568,7 +568,7 @@ if ($SelfTest -or $ListOnly) {
         $completedLast = Get-StateForFinalSha ([pscustomobject]@{ FinalSha = 'expected'; CurrentIndex = 52; ConfirmedIndexes = @(1..52) }) 'expected' '' 52
         if (@($pendingLast.ConfirmedIndexes).Count -ne 51 -or @($completedLast.ConfirmedIndexes).Count -ne 52) { throw 'SelfTest rejected a valid final-item state.' }
         try { Get-StateForFinalSha ([pscustomobject]@{ FinalSha = 'expected'; CurrentIndex = 52; ConfirmedIndexes = @(52) }) 'expected' '' 52 | Out-Null; throw 'SelfTest accepted an invalid saved state.' } catch { if ($_.Exception.Message -eq 'SelfTest accepted an invalid saved state.') { throw } }
-        if (@(Select-CompatibleItems $Items 'rev1_3').Count -ne 51 -or @(Select-CompatibleItems $Items 'rev3_x').Count -ne 1) { throw 'SelfTest profile selection contract failed.' }
+        if (@(Select-CompatibleItems $Items 'rev1_3').Count -ne 1 -or @(Select-CompatibleItems $Items 'rev3_x').Count -ne 51) { throw 'SelfTest profile selection contract failed.' }
         $parsedPreV3 = ConvertFrom-ESP32P4ChipIdOutput 'Chip is ESP32-P4 (revision v1.3)'
         $parsedV3 = ConvertFrom-ESP32P4ChipIdOutput 'Chip is ESP32-P4 (revision v3.2)'
         if ($parsedPreV3.ProfileId -ne 'rev1_3' -or $parsedV3.ProfileId -ne 'rev3_x') { throw 'SelfTest chip revision parser contract failed.' }

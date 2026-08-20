@@ -31,7 +31,7 @@ CSI、3.4/4 英寸显示屏连接器、Codec/ADC、麦克风、扬声器功放�
 | --- | --- |
 | 显示 | 3.4C 使用 `BSP_LCD_TYPE_800_800_3_4_INCH`，4C 使用 `BSP_LCD_TYPE_720_720_4_INCH`；两者均使用 MIPI-DSI 显示路径。LCD 复位为 GPIO27，背光 PWM 为 GPIO26。 |
 | I2C | SDA 为 GPIO7，SCL 为 GPIO8。 |
-| 触控 | 官方控制器为 GT9271。`TP_RST`/`CTP_RESET` 经 0 欧 R62 连接到 GPIO23；`TP_INT`/`CTP_INT` 只连接到 TP2，没有 MCU 路由。托管 BSP 3.0.1 将复位和中断都设为 `GPIO_NUM_NC`：中断与该缺失路由一致，复位则与原理图不一致。 |
+| 触控 | 官方控制器为 GT9271；软件使用 GT911 兼容驱动/API。`TP_RST`/`CTP_RESET` 经 0 欧 R62 连接到 GPIO23；`TP_INT`/`CTP_INT` 只连接到 TP2，没有 MCU 路由。软件有意将两个引脚都保留为 `GPIO_NUM_NC`，不安装 ISR，依次探测 `0x5D` 和 `0x14`，并通过 `esp_lcd_touch_read_data()` 轮询。复位不由软件配置，以避免改变地址/复位 strap 行为。 |
 | microSD | SD D0..D3 使用 GPIO39..GPIO42，CLK 为 GPIO43，CMD 为 GPIO44；与 BSP 约定一致。 |
 | 音频 | ES8311/ES7210 使用 I2S GPIO9..GPIO13，PA 使能为 GPIO53；与 BSP 约定一致。 |
 | 存储器 | ESP32-P4NRW32 具有 32 MB 封装内 PSRAM，GD25Q256 提供 32 MB Flash；与配置的存储 profile 一致。 |
@@ -48,6 +48,6 @@ CSI、3.4/4 英寸显示屏连接器、Codec/ADC、麦克风、扬声器功放�
 4. 记录验证是静态的（源码/原理图）还是包含实体开发板测试。CI 通过只说明可以
    编译，不能单独证明引脚正确。
 
-本 PR 将 vendored BSP 使用者迁移到托管的 `3.0.1`。已审计的显示、I2C、microSD、
-音频和存储器约定一致，触控复位则不一致。编译成功不等同于 HIL 验证；在依赖托管
-触控复位约定前，仍必须进行回归。
+托管 BSP 保持已发布的 `3.0.1`，其中已经提供双地址、无引脚、轮询的触控约定，
+不需要未发布的 `3.0.2`。本静态审计和编译成功均不能证明实体板卡的总线事务；
+仍须在两种显示变体上完成有响应地址、坐标、抬起事件和轮询行为的 HIL 验证。

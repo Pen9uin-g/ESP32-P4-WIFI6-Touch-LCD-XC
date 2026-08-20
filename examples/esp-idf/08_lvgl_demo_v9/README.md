@@ -18,10 +18,11 @@ idf.py build
 idf.py -p PORT flash monitor
 ```
 
-CI compiles explicit 3.4C and 4C variants on both ESP-IDF lines. The managed
-touch API retains the documented BSP `3.0.1` touch-reset boundary: static
-evidence matches its interrupt choice but not its `GPIO_NUM_NC` reset choice.
-Compile coverage is not touch HIL; real 3.4C and 4C validation remains required.
+CI compiles explicit 3.4C and 4C variants on both ESP-IDF lines. The published
+BSP `3.0.1` leaves touch RST and INT unconfigured, probes `0x5D` then `0x14`,
+and uses polling without an ISR. Compile coverage is not touch HIL; the
+responding address, coordinates, release events, and polling still require real
+3.4C and 4C validation.
 
 See [Getting Started](../../../docs/GETTING_STARTED.md),
 [Component Ownership](../../../docs/COMPONENTS.md),

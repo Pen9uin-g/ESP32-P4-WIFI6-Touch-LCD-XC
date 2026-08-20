@@ -12,6 +12,8 @@
 **/dependencies.lock
 **/sdkconfig
 **/sdkconfig.old
+**/sdkconfig.ci.generated-*
 **/__pycache__
 **/*.pyc
 **/.codex/pdf-preview-cache
+!/.gitattributes

@@ -16,11 +16,13 @@ GitHub Actions 使用 Arduino-ESP32 `3.3.11` 编译 5 个一方示例。CI 使�
 开发板配置：
 
 ```text
-esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600
+esp32:esp32:esp32p4:ChipVariant=postv3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600
 ```
 
-该配置选择 pre-v3 ESP32-P4 silicon，启用板载 32 MB PSRAM 和 32 MB Flash，
-并为图形示例提供 13 MB 应用分区。
+该配置选择 post-v3 ESP32-P4 silicon，启用板载 32 MB PSRAM 和 32 MB Flash，
+并为图形示例提供 13 MB 应用分区。对于已确认的 pre-v3 芯片，应显式把
+`ChipVariant=postv3` 替换为 `ChipVariant=prev3`；该构建不属于默认 CI 矩阵，
+其二进制文件也不能与 `rev3_x` 构建互换。
 
 ### USB 接口与非阻塞日志
 
@@ -38,6 +40,13 @@ CI FQBN 选择 `USBMode=hwcdc,CDCOnBoot=cdc`，因此示例的 `Serial` 日志�
 | --- | --- |
 | ESP32-P4-WIFI6-Touch-LCD-3.4C | `CURRENT_SCREEN=SCREEN_3INCH_4_DSI` |
 | ESP32-P4-WIFI6-Touch-LCD-4C | `CURRENT_SCREEN=SCREEN_4INCH_DSI` |
+
+### 触控行为
+
+官方控制器为 GT9271，Arduino 库使用 GT911 兼容 API。驱动有意不配置 RST 和 INT，
+不安装中断处理器，依次探测 `0x5D` 与 `0x14`，并轮询触控数据。尽管原理图经 R62 将
+RST 路由至 GPIO23，INT 只到达 TP2；不由软件复位/设置地址 strap，可使轮询路径不依赖
+这些信号。编译不能确认有响应地址、坐标或抬起事件；请在真实硬件上验证。
 
 ### 文档
 

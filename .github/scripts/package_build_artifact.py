@@ -31,8 +31,11 @@ TRUSTED_REPO_ROOT = Path(__file__).resolve().parents[2]
 FULL_SHA_RE = re.compile(r"[0-9a-f]{40}")
 BSP_VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
 FLASH_SIZE_RE = re.compile(r"([1-9][0-9]*)([KMG])B?", re.IGNORECASE)
+ARDUINO_PROFILE_CHIP_VARIANTS = {
+    "rev1_3": "prev3",
+    "rev3_x": "postv3",
+}
 REQUIRED_ARDUINO_SELECTIONS = {
-    "ChipVariant": "prev3",
     "PSRAM": "enabled",
     "FlashSize": "32M",
     "FlashMode": "qio",
@@ -91,7 +94,9 @@ def parse_flash_size(value: str) -> int:
     return int(match.group(1)) * scale
 
 
-def parse_fqbn_selections(value: str) -> dict[str, str]:
+def parse_fqbn_selections(
+    value: str, profile_id: str | None = None
+) -> dict[str, str]:
     prefix, separator, raw_options = value.partition(":esp32p4:")
     if prefix != "esp32:esp32" or not separator or not raw_options:
         raise PackageError("generated Arduino FQBN is not an esp32p4 FQBN")
@@ -101,11 +106,22 @@ def parse_fqbn_selections(value: str) -> dict[str, str]:
         if not separator or not key or not option_value or key in selections:
             raise PackageError("generated Arduino FQBN has invalid or duplicate selections")
         selections[key] = option_value
+    if selections.get("ChipVariant") not in set(ARDUINO_PROFILE_CHIP_VARIANTS.values()):
+        raise PackageError("generated Arduino FQBN must select a supported ChipVariant")
     for key, required in REQUIRED_ARDUINO_SELECTIONS.items():
         if selections.get(key) != required:
             raise PackageError(f"generated Arduino FQBN must select {key}={required}")
-    if set(selections) != set(REQUIRED_ARDUINO_SELECTIONS):
+    if set(selections) != {"ChipVariant", *REQUIRED_ARDUINO_SELECTIONS}:
         raise PackageError("generated Arduino FQBN contains unsupported extra selections")
+    if profile_id:
+        expected_chip_variant = ARDUINO_PROFILE_CHIP_VARIANTS.get(profile_id)
+        if not expected_chip_variant:
+            raise PackageError(f"unsupported Arduino silicon profile: {profile_id}")
+        if selections["ChipVariant"] != expected_chip_variant:
+            raise PackageError(
+                f"generated Arduino FQBN must select ChipVariant={expected_chip_variant} "
+                f"for {profile_id}"
+            )
     return selections
 
 
@@ -167,9 +183,7 @@ def parse_build_options(
     actual_fqbn = data.get("fqbn")
     if not isinstance(actual_fqbn, str) or actual_fqbn != expected_fqbn:
         raise PackageError("generated Arduino FQBN does not match the requested FQBN")
-    parse_fqbn_selections(actual_fqbn)
-    if profile_id != "rev1_3":
-        raise PackageError("generated Arduino options do not match rev1_3 ChipVariant=prev3")
+    parse_fqbn_selections(actual_fqbn, profile_id)
     raw_hardware_folders = data.get("hardwareFolders")
     if not isinstance(raw_hardware_folders, str) or not raw_hardware_folders:
         raise PackageError("generated Arduino options do not identify the installed core")
@@ -1087,7 +1101,7 @@ def main() -> int:
         if args.sketch:
             safe_relative(args.sketch)
         if args.mode == "arduino" and (
-            args.profile_id != "rev1_3"
+            args.profile_id != "rev3_x"
             or not args.fqbn
             or not args.sketch
             or not args.build_options
@@ -1098,7 +1112,7 @@ def main() -> int:
             or not args.bsp_version
         ):
             raise PackageError(
-                "Arduino artifacts require rev1_3 FQBN, sketch, source root, build options, and BSP reference pins"
+                "Arduino artifacts require rev3_x ChipVariant=postv3 FQBN, sketch, source root, build options, and BSP reference pins"
             )
         if args.mode == "esp-idf" and not args.sdkconfig:
             raise PackageError("ESP-IDF artifacts require generated sdkconfig")

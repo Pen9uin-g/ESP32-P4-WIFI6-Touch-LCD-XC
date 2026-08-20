@@ -5,7 +5,7 @@ dependencies:
     version: "3.0.1"
 
   espressif/esp_audio_codec:
-    # v2.6+ requires ESP32-P4 rev >= 3.0; this board's default configuration
-    # targets the supported rev 1 hardware, so keep the last compatible line.
-    version: ">=2.3.0,<2.6.0"
+    # v2.6+ requires ESP32-P4 rev >= 3.0. Keep the published 2.5.0 release so
+    # the explicit rev1_3 compatibility profile remains buildable.
+    version: "2.5.0"
     public: true

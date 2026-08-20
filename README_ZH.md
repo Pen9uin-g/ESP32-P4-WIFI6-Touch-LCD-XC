@@ -58,9 +58,10 @@ MIPI-DSI 触控屏，适合用于图形化人机交互、多媒体应用、边�
 
 CI 使用 ESP-IDF `v5.5.5` 和 `v6.0.2` 测试全部一方 ESP-IDF 工程。
 
-所有示例默认使用 `rev1_3`（pre-v3）ESP32-P4 profile。对应 Arduino FQBN 使用
-`ChipVariant=prev3`；revision profile 只是元数据，不会增加示例矩阵维度。不同芯片
-profile 的二进制文件不能互换。
+所有示例默认使用 `rev3_x` ESP32-P4 芯片 profile。启用 PSRAM 时，默认 ESP-IDF 配置
+使用 250 MHz，对应 Arduino FQBN 使用 `ChipVariant=postv3`。`rev1_3` 是面向 pre-v3
+芯片的显式兼容配置，会把已启用的 PSRAM 限制为 200 MHz，不是第二套默认示例矩阵。`rev1_3` 与 `rev3_x`
+的二进制文件不能互换。这些是芯片 profile，不是 PCB 版本，不能据此判断开发板版本。
 
 ```bash
 cd examples/esp-idf/02_HelloWorld
@@ -118,7 +119,7 @@ idf.py -p PORT flash monitor
 | --- | --- |
 | 仓库自检 | 文档、工程结构与一方 Arduino 示例目录 |
 | ESP-IDF | 12 个一方工程 × ESP-IDF `v5.5.5`/`v6.0.2`：01–06 在每个 ESP-IDF 版本各构建一个共享的非显示配置（12 个任务），07–11 同时构建 3.4C 与 4C 显示配置（20 个任务），USB 同时构建双显示配置及 default/vendor-only 配置（8 个任务）；完整路由共 40 个任务 |
-| Arduino | 5 个一方 `rev1_3` 示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置（10 个任务） |
+| Arduino | 5 个一方 `rev3_x` 示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置（10 个任务） |
 | 维护固件 | `firmware/brookesia` 的两个 ESP-IDF `v5.5.5` P4-only 产物：`rev1_3` 和 `rev3_x`；固件默认使用 3.4C |
 
 每个 Pull Request 都会得到可见的策略、ESP-IDF 路由和 Arduino 路由结论。纯文档

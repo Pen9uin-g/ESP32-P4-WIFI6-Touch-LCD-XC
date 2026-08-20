@@ -22,11 +22,11 @@ concurrency:
 env:
   ARDUINO_CORE_VERSION: "3.3.11"
   ESP32_INDEX_URL: "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
-  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600"
-  BSP_REFERENCE_VERSION: "3.0.2"
-  BSP_REFERENCE_SOURCE_SHA: "a95610f6f324bb32b2cba4fa347cdf1b892187b0"
-  BSP_REFERENCE_SOURCE_TREE: "5f4f0f350d536005c078981a5452d24ac0098324"
-  BSP_REFERENCE_COMPONENT_TREE: "5743d069eb272fabc6b066c5fd0b871085d30575"
+  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=postv3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600"
+  BSP_REFERENCE_VERSION: "3.0.1"
+  BSP_REFERENCE_SOURCE_SHA: "bfeb6e6d5737178cdde78b630c8118074da0a657"
+  BSP_REFERENCE_SOURCE_TREE: "7c12c7115599b4bb84072ad9ea68cc8c3e81b9c6"
+  BSP_REFERENCE_COMPONENT_TREE: "eff6286f5bb97145fb43a33102b9dafdfa5f5c0b"
   BSP_REFERENCE_RELATIONSHIP: "reference-only"
 
 jobs:

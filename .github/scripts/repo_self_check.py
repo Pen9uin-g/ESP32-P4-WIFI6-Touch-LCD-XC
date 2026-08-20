@@ -12,8 +12,37 @@ PROJECT_ROOTS = (
     Path("examples/esp-idf"),
 )
 ARDUINO_SKETCH_ROOT = Path("examples/arduino/examples")
+PROFILE_DEFAULTS = {
+    "rev1_3": (
+        "CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y",
+        "CONFIG_ESP32P4_REV_MIN_100=y",
+        "CONFIG_SPIRAM_SPEED_200M=y",
+        "CONFIG_SPIRAM_SPEED=200",
+    ),
+    "rev3_x": (
+        "CONFIG_ESP32P4_SELECTS_REV_LESS_V3=n",
+        "CONFIG_ESP32P4_REV_MIN_300=y",
+        "CONFIG_SPIRAM_SPEED_250M=y",
+        "CONFIG_SPIRAM_SPEED=250",
+    ),
+}
+PROFILE_FORBIDDEN_DEFAULTS = {
+    "rev1_3": (
+        "CONFIG_ESP32P4_SELECTS_REV_LESS_V3=n",
+        "CONFIG_ESP32P4_REV_MIN_300=y",
+        "CONFIG_SPIRAM_SPEED_250M=y",
+        "CONFIG_SPIRAM_SPEED=250",
+    ),
+    "rev3_x": (
+        "CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y",
+        "CONFIG_ESP32P4_REV_MIN_100=y",
+        "CONFIG_SPIRAM_SPEED_200M=y",
+        "CONFIG_SPIRAM_SPEED=200",
+    ),
+}
 
 REQUIRED_FILES = (
+    Path(".gitattributes"),
     Path("README.md"),
     Path("README_ZH.md"),
     Path("assets/ESP32-P4-WIFI6-Touch-LCD-XC.jpg"),
@@ -79,6 +108,7 @@ REQUIRED_GITIGNORE_PATTERNS = {
     "**/dependencies.lock",
     "**/sdkconfig",
     "**/sdkconfig.old",
+    "**/sdkconfig.ci.generated-*",
     "**/__pycache__",
     "**/*.pyc",
 }
@@ -141,15 +171,27 @@ def check_projects(errors: list[str]) -> list[Path]:
 
         if not (project / "main" / "CMakeLists.txt").is_file():
             errors.append(f"Missing main/CMakeLists.txt: {project.as_posix()}")
-        defaults = project / "sdkconfig.defaults"
-        if not defaults.is_file():
-            errors.append(f"Missing revision defaults: {project.as_posix()}")
-        else:
-            text = defaults.read_text(encoding="utf-8")
-            if "CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y" not in text or "CONFIG_ESP32P4_REV_MIN_100=y" not in text or "REV_MIN_1=y" in text:
-                errors.append(f"Invalid rev1_3 defaults: {project.as_posix()}")
+        check_profile_defaults(project / "sdkconfig.defaults", "rev3_x", errors)
+        for profile_id in PROFILE_DEFAULTS:
+            check_profile_defaults(
+                project / f"sdkconfig.defaults.{profile_id}", profile_id, errors
+            )
 
     return projects
+
+
+def check_profile_defaults(path: Path, profile_id: str, errors: list[str]) -> None:
+    if not path.is_file():
+        errors.append(f"Missing {profile_id} defaults: {path.as_posix()}")
+        return
+
+    text = path.read_text(encoding="utf-8")
+    missing = [value for value in PROFILE_DEFAULTS[profile_id] if value not in text]
+    forbidden = [
+        value for value in PROFILE_FORBIDDEN_DEFAULTS[profile_id] if value in text
+    ]
+    if missing or forbidden:
+        errors.append(f"Invalid {profile_id} defaults: {path.as_posix()}")
 
 
 def check_managed_bsp(errors: list[str]) -> None:

@@ -34,7 +34,7 @@ board-facing change is made.
 | --- | --- |
 | Display | 3.4C uses `BSP_LCD_TYPE_800_800_3_4_INCH`, 4C uses `BSP_LCD_TYPE_720_720_4_INCH`; both use the MIPI-DSI display path. LCD reset is GPIO27 and backlight PWM is GPIO26. |
 | I2C | SDA is GPIO7 and SCL is GPIO8. |
-| Touch | The official controller is GT9271. `TP_RST`/`CTP_RESET` reaches GPIO23 through 0-ohm R62; `TP_INT`/`CTP_INT` reaches only TP2, with no MCU route. Managed BSP 3.0.1 sets both reset and interrupt to `GPIO_NUM_NC`: interrupt matches that missing route, reset does not match the schematic. |
+| Touch | The official controller is GT9271; the software uses a GT911-compatible driver/API. `TP_RST`/`CTP_RESET` reaches GPIO23 through 0-ohm R62, while `TP_INT`/`CTP_INT` reaches only TP2 with no MCU route. Software deliberately leaves both pins `GPIO_NUM_NC`, installs no ISR, probes `0x5D` then `0x14`, and polls with `esp_lcd_touch_read_data()`. Leaving reset unconfigured avoids changing the address/reset strap behavior. |
 | microSD | SD D0..D3 use GPIO39..GPIO42, CLK GPIO43, and CMD GPIO44; this matches the BSP contract. |
 | Audio | ES8311/ES7210 use I2S GPIO9..GPIO13 and PA enable GPIO53; this matches the BSP contract. |
 | Memory | ESP32-P4NRW32 has 32 MB in-package PSRAM and the GD25Q256 provides 32 MB flash; this matches the configured memory profile. |
@@ -52,7 +52,8 @@ Before changing a hardware constant or board-facing README:
 4. Record whether validation is static (source/schematic) or includes a physical
    board test. A successful CI build proves compilation, not pin correctness.
 
-This PR migrates vendored BSP consumers to managed `3.0.1`. The audited display,
-I2C, microSD, audio, and memory contracts match; touch reset does not. A
-successful compile is not HIL validation, so regression remains required before
-relying on the managed touch-reset contract.
+The managed BSP remains at published `3.0.1`, which already provides the
+dual-address, no-pin, polling touch contract; no unpublished `3.0.2` is needed.
+This static audit and a successful compile do not prove a board transaction.
+HIL remains required for the responding address, coordinates, release events,
+and polling behavior on both display variants.

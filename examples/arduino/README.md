@@ -17,12 +17,15 @@ GitHub Actions compiles the five first-party sketches with Arduino-ESP32
 `3.3.11`. The CI board configuration is:
 
 ```text
-esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600
+esp32:esp32:esp32p4:ChipVariant=postv3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600
 ```
 
-This selects pre-v3 ESP32-P4 silicon at the board-supported frequency, enables
+This selects post-v3 ESP32-P4 silicon at the board-supported frequency, enables
 the onboard 32 MB PSRAM and 32 MB flash, and provides a 13 MB application
-partition for the larger graphics examples.
+partition for the larger graphics examples. For confirmed pre-v3 silicon,
+replace `ChipVariant=postv3` with `ChipVariant=prev3` explicitly; that build is
+not part of the default CI matrix, and its binary is not interchangeable with
+the `rev3_x` build.
 
 ### USB ports and non-blocking logs
 
@@ -42,6 +45,16 @@ Every sketch is compiled for both product displays:
 | --- | --- |
 | ESP32-P4-WIFI6-Touch-LCD-3.4C | `CURRENT_SCREEN=SCREEN_3INCH_4_DSI` |
 | ESP32-P4-WIFI6-Touch-LCD-4C | `CURRENT_SCREEN=SCREEN_4INCH_DSI` |
+
+### Touch behavior
+
+The official controller is GT9271, and the Arduino library uses a
+GT911-compatible API. The driver intentionally leaves both RST and INT
+unconfigured, installs no interrupt handler, probes `0x5D` then `0x14`, and
+polls touch data. Although the schematic routes RST through R62 to GPIO23, INT
+only reaches TP2; avoiding software reset/address-strapping keeps the polling
+path independent of those signals. Compilation does not confirm the responding
+address, coordinates, or release events; verify them on real hardware.
 
 ### Documentation
 

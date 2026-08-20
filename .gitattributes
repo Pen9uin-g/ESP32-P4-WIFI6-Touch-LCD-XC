@@ -1,0 +1,3 @@
+examples/arduino/libraries/displays/gt911.cpp whitespace=cr-at-eol
+examples/arduino/libraries/displays/gt911.h whitespace=cr-at-eol
+examples/esp-idf/06_I2SCodec/sdkconfig.defaults whitespace=cr-at-eol
