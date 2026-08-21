@@ -22,8 +22,7 @@ IDF_ROOT = Path("examples/esp-idf")
 ARDUINO_ROOT = Path("examples/arduino/examples")
 ARDUINO_LIBRARY_ROOT = "examples/arduino/libraries"
 DEFAULT_IDF_VERSIONS = ("v5.5.5", "v6.0.2")
-# Product examples target ESP32-P4 rev3.x by default.  The maintained-firmware
-# matrix retains both explicitly selectable silicon profiles below.
+# Product examples and maintained firmware target ESP32-P4 rev3.x by default.
 DEFAULT_PROFILE_ID = "rev3_x"
 FIRMWARE_PROJECT = "firmware/brookesia"
 SCREEN_VARIANTS = (
@@ -411,18 +410,34 @@ def arduino_matrix(sketches: list[str]) -> dict[str, list[dict[str, str]]]:
 
 
 def firmware_matrix(selected: bool) -> dict[str, list[dict[str, str]]]:
-    """Two independent maintained-firmware profiles; never expand examples."""
+    """Build the maintained rev3.x firmware once for each supported XC panel."""
     if not selected:
         return {"include": []}
     return {"include": [
-        {"project": FIRMWARE_PROJECT, "project_name": "brookesia", "profile_id": "rev1_3",
-         "build_dir": "build-rev1_3", "sdkconfig": "sdkconfig.ci.generated-rev1_3",
-         "sdkconfig_defaults": "sdkconfig.defaults;sdkconfig.defaults.rev1_3",
-         "artifact_key": "xc-3_4c-maintained-firmware-rev1_3-brookesia-default"},
-        {"project": FIRMWARE_PROJECT, "project_name": "brookesia", "profile_id": "rev3_x",
-         "build_dir": "build-rev3_x", "sdkconfig": "sdkconfig.ci.generated-rev3_x",
-         "sdkconfig_defaults": "sdkconfig.defaults;sdkconfig.defaults.rev3_x",
-         "artifact_key": "xc-3_4c-maintained-firmware-rev3_x-brookesia-default"},
+        {
+            "project": FIRMWARE_PROJECT,
+            "project_name": "brookesia",
+            "profile_id": DEFAULT_PROFILE_ID,
+            "variant": variant["screen"],
+            "variant_id": variant["variant_id"],
+            "resolution": variant["resolution"],
+            "build_dir": f"build-{variant['variant_id']}-{DEFAULT_PROFILE_ID}",
+            "sdkconfig": f"sdkconfig.ci.generated-{variant['variant_id']}-{DEFAULT_PROFILE_ID}",
+            "sdkconfig_defaults": (
+                "sdkconfig.defaults;"
+                f"sdkconfig.defaults.{DEFAULT_PROFILE_ID};"
+                f"sdkconfig.defaults.{variant['variant_id']}"
+            ),
+            "command": (
+                "bash ../../.github/scripts/build_maintained_firmware.sh "
+                f"{DEFAULT_PROFILE_ID} {variant['variant_id']}"
+            ),
+            "artifact_key": (
+                f"xc-{variant['variant_id']}-maintained-firmware-"
+                f"{DEFAULT_PROFILE_ID}-brookesia-default"
+            ),
+        }
+        for variant in SCREEN_VARIANTS
     ]}
 
 

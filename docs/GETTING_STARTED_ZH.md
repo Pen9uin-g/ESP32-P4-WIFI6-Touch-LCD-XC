@@ -43,8 +43,8 @@ idf.py -p PORT flash monitor
 
 - `examples/esp-idf/<example>`
 
-`firmware/` 是单独维护的源码/交付面，会被盘点但不会进入默认示例 CI 矩阵；
-修改前请阅读[固件源码边界](FIRMWARE_ZH.md)。
+`firmware/` 是单独维护的源码/交付面，不会进入默认示例 CI 矩阵；它只使用
+rev3.x 的 `3_4c` 和 `4c` profile。修改前请阅读[固件源码边界](FIRMWARE_ZH.md)。
 
 也可以使用 ESP-IDF 的工程路径参数：
 

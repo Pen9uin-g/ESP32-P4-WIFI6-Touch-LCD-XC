@@ -49,8 +49,8 @@ select the required model under **Version Options**.
 | Application processor | ESP32-P4NRW32 with dual-core HP RISC-V up to 360 MHz and an LP RISC-V core up to 40 MHz |
 | Memory | 32 MB in-package PSRAM and 32 MB NOR Flash |
 | Wireless | ESP32-C6-MINI-1 over SDIO, providing 2.4 GHz Wi-Fi 6 and Bluetooth 5 (LE) |
-| Display | 2-lane MIPI-DSI round IPS LCD; 3.4-inch 800 × 800 or 4-inch 720 × 720 |
-| Touch | Official hardware uses a GT9271 capacitive-touch controller; the examples use a managed GT911-compatible driver/API |
+| Display | 2-lane MIPI-DSI round IPS LCD; 3.4-inch 800 × 800 or 4-inch 720 × 720. Both variants use 1,500 Mbps/lane and an 80 MHz DPI clock. |
+| Touch | Official hardware uses a GT9271 capacitive-touch controller; the examples use a managed GT911-compatible driver/API with address probing and polling. |
 | Camera | 2-lane MIPI-CSI camera interface |
 | Audio | ES8311 audio codec, ES7210 audio ADC, onboard microphones, and an 8 Ω / 2 W speaker header |
 | Storage and USB | SDIO 3.0 microSD slot and USB 2.0 OTG High-Speed |
@@ -73,6 +73,12 @@ enabled, the default ESP-IDF configuration uses 250 MHz, and the matching Arduin
 pre-v3 silicon and limits enabled PSRAM to 200 MHz; it is not a second default example
 matrix. `rev1_3` and `rev3_x` binaries are incompatible. These are silicon
 profiles, not PCB revisions, so neither identifies a board revision.
+
+For the DSI PHY reference clock, pre-v3 uses the legacy PLL_F20M source while
+rev3.x uses XTAL. The managed BSP uses `.phy_clk_src = 0` so ESP-IDF selects
+the correct source from the silicon profile; the Arduino display adapter follows
+the same rev3.x-safe selection. Do not change the 80 MHz DPI clock when changing
+the PHY reference source.
 
 ```bash
 cd examples/esp-idf/02_HelloWorld
@@ -114,11 +120,16 @@ The maintained ESP-Brookesia firmware application is under
 
 | Sketch | Focus |
 | --- | --- |
-| [HelloWorld](examples/arduino/examples/HelloWorld/) | Display bring-up |
-| [AsciiTable](examples/arduino/examples/AsciiTable/) | Text and character rendering |
-| [Drawing_board](examples/arduino/examples/Drawing_board/) | Capacitive-touch drawing board |
-| [GFX_ESPWiFiAnalyzer](examples/arduino/examples/GFX_ESPWiFiAnalyzer/) | Wi-Fi scanning and channel visualization |
-| [LVGLV9_Arduino](examples/arduino/examples/LVGLV9_Arduino/) | LVGL 9 display and touch demo |
+| [01_HelloWorld](examples/arduino/examples/01_HelloWorld/) | Display bring-up |
+| [02_AsciiTable](examples/arduino/examples/02_AsciiTable/) | Text and character rendering |
+| [03_Drawing_board](examples/arduino/examples/03_Drawing_board/) | Capacitive-touch drawing board |
+| [04_LVGLV9_Arduino](examples/arduino/examples/04_LVGLV9_Arduino/) | LVGL 9 display and touch demo |
+| [05_GFX_ESPWiFiAnalyzer](examples/arduino/examples/05_GFX_ESPWiFiAnalyzer/) | Wi-Fi scanning and channel visualization |
+| [06_Camera_Preview](examples/arduino/examples/06_Camera_Preview/) | Camera preview |
+| [07_Camera_ISP_Tuning](examples/arduino/examples/07_Camera_ISP_Tuning/) | Camera ISP controls |
+| [08_SD_Card](examples/arduino/examples/08_SD_Card/) | microSD card access |
+| [09_Audio_Playback](examples/arduino/examples/09_Audio_Playback/) | ES8311 audio playback |
+| [10_Mic_Record](examples/arduino/examples/10_Mic_Record/) | ES7210 microphone capture |
 
 Bundled libraries are kept under
 [`examples/arduino/libraries`](examples/arduino/libraries/). Their upstream
@@ -132,16 +143,16 @@ platform guidance.
 | --- | --- |
 | Repository self-check | Documentation, project structure, and first-party sketch layout |
 | ESP-IDF | 12 first-party projects × ESP-IDF `v5.5.5`/`v6.0.2`: 01–06 each build one shared non-display configuration per ESP-IDF line (12 jobs), 07–11 build both 3.4C and 4C displays (20 jobs), and USB builds both displays with default and vendor-only configurations (8 jobs); 40 jobs on a complete route |
-| Arduino | 5 first-party `rev3_x` sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays (10 jobs) |
-| Maintained firmware | Two ESP-IDF `v5.5.5` P4-only artifacts for `firmware/brookesia`: `rev1_3` and `rev3_x`; 3.4C is the firmware default |
+| Arduino | 10 first-party `rev3_x` sketches with Arduino-ESP32 `3.3.11`, compiled for both the 3.4C and 4C displays (20 jobs) |
+| Maintained firmware | Two ESP-IDF `v5.5.5` P4-only, rev3.x artifacts for `firmware/brookesia`: `3_4c` (800 × 800) and `4c` (720 × 720) |
 
 Every pull request gets visible policy, ESP-IDF-routing, and Arduino-routing
 results. Documentation-only changes skip product build jobs. Source or shared
 build-input changes select the affected matrix, and unknown paths fail policy
 after conservatively selecting both complete matrices. The maintained
-`firmware/` source selects its separate two-profile firmware workflow but remains
-outside the default example matrix. A complete artifact set has 52 items
-(40 ESP-IDF examples + 10 Arduino examples + 2 maintained firmware). Bundled library examples are excluded from
+`firmware/` source selects its separate two-display-profile firmware workflow but remains
+outside the default example matrix. A complete configured artifact set has 62 items
+(40 ESP-IDF examples + 20 Arduino examples + 2 maintained firmware). Bundled library examples are excluded from
 discovery. See [Continuous Integration](docs/CI.md) for exact behavior.
 
 ## 🗂️ Repository Layout

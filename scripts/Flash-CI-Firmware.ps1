@@ -98,7 +98,7 @@ function Get-CiItems([string]$PythonExe) {
     $idf = @($route.idf_matrix.include)
     $arduino = @($route.arduino_matrix.include)
     $firmware = @($route.firmware_matrix.include)
-    if ($idf.Count -ne 40 -or $arduino.Count -ne 10 -or $firmware.Count -ne 2) { throw "CI router matrix must contain 40 ESP-IDF, 10 Arduino, and 2 maintained-firmware entries; got $($idf.Count), $($arduino.Count), and $($firmware.Count)." }
+    if ($idf.Count -ne 40 -or $arduino.Count -ne 20 -or $firmware.Count -ne 2) { throw "CI router matrix must contain 40 ESP-IDF, 20 Arduino, and 2 maintained-firmware entries; got $($idf.Count), $($arduino.Count), and $($firmware.Count)." }
     $arduinoIdentity = Get-ExpectedArduinoIdentity
     $items = @(); $index = 1
     foreach ($entry in $idf) {
@@ -112,8 +112,8 @@ function Get-CiItems([string]$PythonExe) {
         $index++
     }
     foreach ($entry in $firmware) {
-        if ($entry.project -ne 'firmware/brookesia' -or $entry.profile_id -notin @('rev1_3', 'rev3_x') -or [string]$entry.artifact_key -notmatch [string]$entry.profile_id) { throw 'Maintained firmware router entry is outside the XC CI contract.' }
-        $items += [pscustomobject]@{ Index = $index; Workflow = 'maintained-firmware.yml'; ArtifactKey = [string]$entry.artifact_key; SourceType = 'esp-idf'; FrameworkName = 'ESP-IDF'; FrameworkVersion = 'v5.5.5'; Project = [string]$entry.project; Sketch = ''; Configuration = 'default'; VariantId = '3_4c'; Variant = '3.4C'; ProfileId = [string]$entry.profile_id; ArtifactKind = 'maintained-firmware' }
+        if ($entry.project -ne 'firmware/brookesia' -or $entry.profile_id -ne 'rev3_x' -or $entry.variant_id -notin @('3_4c', '4c') -or $entry.variant -notin @('3.4C', '4C') -or [string]$entry.artifact_key -notmatch 'rev3_x' -or [string]$entry.artifact_key -notmatch [string]$entry.variant_id -or [string]$entry.sdkconfig_defaults -notmatch 'sdkconfig\.defaults\.rev3_x' -or [string]$entry.sdkconfig_defaults -notmatch ('sdkconfig\.defaults\.' + [string]$entry.variant_id)) { throw 'Maintained firmware router entry is outside the XC rev3 dual-panel CI contract.' }
+        $items += [pscustomobject]@{ Index = $index; Workflow = 'maintained-firmware.yml'; ArtifactKey = [string]$entry.artifact_key; SourceType = 'esp-idf'; FrameworkName = 'ESP-IDF'; FrameworkVersion = 'v5.5.5'; Project = [string]$entry.project; Sketch = ''; Configuration = 'default'; VariantId = [string]$entry.variant_id; Variant = [string]$entry.variant; Resolution = [string]$entry.resolution; ProfileId = [string]$entry.profile_id; ArtifactKind = 'maintained-firmware' }
         $index++
     }
     $keys = @($items | ForEach-Object ArtifactKey)
@@ -121,7 +121,7 @@ function Get-CiItems([string]$PythonExe) {
     $display = @($idf | Where-Object { $_.variant_id -in @('3_4c', '4c') })
     $usb = @($idf | Where-Object { $_.project_name -eq '12_usb_extend_screen' })
     $dualScreen = @($idf | Where-Object { $_.project_name -in @('07_Displaycolorbar', '08_lvgl_demo_v9', '09_video_lcd_display', '10_mp4_player', '11_esp_brookesia_phone') })
-    if ($items.Count -ne 52 -or @($keys | Sort-Object -Unique).Count -ne 52 -or @($items | Where-Object { $_.Workflow -eq 'esp-idf-projects.yml' }).Count -ne 40 -or @($items | Where-Object { $_.Workflow -eq 'arduino-projects.yml' }).Count -ne 10 -or @($items | Where-Object { $_.Workflow -eq 'maintained-firmware.yml' }).Count -ne 2 -or $shared.Count -ne 12 -or @($shared | Where-Object { $_.configuration -ne 'default' }).Count -ne 0 -or $display.Count -ne 28 -or $dualScreen.Count -ne 20 -or $usb.Count -ne 8 -or @($usb | Where-Object { $_.configuration -notin @('default', 'vendor-only') }).Count -ne 0) { throw 'CI item matrix is not the required unique 40+10+2 XC profile contract.' }
+    if ($items.Count -ne 62 -or @($keys | Sort-Object -Unique).Count -ne 62 -or @($items | Where-Object { $_.Workflow -eq 'esp-idf-projects.yml' }).Count -ne 40 -or @($items | Where-Object { $_.Workflow -eq 'arduino-projects.yml' }).Count -ne 20 -or @($items | Where-Object { $_.Workflow -eq 'maintained-firmware.yml' }).Count -ne 2 -or $shared.Count -ne 12 -or @($shared | Where-Object { $_.configuration -ne 'default' }).Count -ne 0 -or $display.Count -ne 28 -or $dualScreen.Count -ne 20 -or $usb.Count -ne 8 -or @($usb | Where-Object { $_.configuration -notin @('default', 'vendor-only') }).Count -ne 0) { throw 'CI item matrix is not the required unique 40+20+2 XC rev3 dual-panel contract.' }
     return $items
 }
 
@@ -324,9 +324,9 @@ function Get-ESP32P4SiliconProfile([string]$PythonExe, [string]$SelectedPort) {
 function Select-CompatibleItems($Items, [string]$ProfileId) {
     $selected = @($Items | Where-Object { $_.ProfileId -eq $ProfileId })
     if ($ProfileId -eq 'rev1_3') {
-        if ($selected.Count -ne 1 -or $selected[0].ArtifactKind -ne 'maintained-firmware') { throw 'Pre-v3 ESP32-P4 must select only the rev1_3 maintained-firmware artifact.' }
+        throw 'This XC CI catalog is rev3.x-only; pre-v3 ESP32-P4 silicon is not supported.'
     } elseif ($ProfileId -eq 'rev3_x') {
-        if ($selected.Count -ne 51 -or @($selected | Where-Object { $_.ArtifactKind -eq 'ci-example' }).Count -ne 50 -or @($selected | Where-Object { $_.ArtifactKind -eq 'maintained-firmware' }).Count -ne 1) { throw 'ESP32-P4 revision >= 3.0 must select the 50 rev3_x example artifacts plus rev3_x maintained firmware.' }
+        if ($selected.Count -ne 62 -or @($selected | Where-Object { $_.ArtifactKind -eq 'ci-example' }).Count -ne 60 -or @($selected | Where-Object { $_.ArtifactKind -eq 'maintained-firmware' }).Count -ne 2) { throw 'ESP32-P4 revision >= 3.0 must select the 60 rev3_x example artifacts plus both rev3_x maintained-firmware panel variants.' }
     } else { throw "Unsupported ESP32-P4 profile: $ProfileId" }
     $index = 1
     foreach ($item in $selected) { $item.Index = $index; $index++ }
@@ -559,16 +559,17 @@ if ($SelfTest -or $ListOnly) {
         $last = Get-NextProgress $current $confirmed $Items.Count
         $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'ci-package'
         $absoluteTestPath = Join-Path ([System.IO.Path]::GetTempPath()) 'escape.bin'
-        if (-not $last.Completed -or @($last.ConfirmedIndexes).Count -ne 52 -or (Test-SafeRelativePackagePath $testRoot '..\escape.bin') -or (Test-SafeRelativePackagePath $testRoot $absoluteTestPath) -or -not (Test-SafeRelativePackagePath $testRoot 'bin\app.bin')) { throw 'SelfTest safety or progress check failed.' }
+        if (-not $last.Completed -or @($last.ConfirmedIndexes).Count -ne 62 -or (Test-SafeRelativePackagePath $testRoot '..\escape.bin') -or (Test-SafeRelativePackagePath $testRoot $absoluteTestPath) -or -not (Test-SafeRelativePackagePath $testRoot 'bin\app.bin')) { throw 'SelfTest safety or progress check failed.' }
         $arduinoOptions = @(Get-FlashOptions ([pscustomobject]@{ esptool_options = @('--flash-mode', 'dio', '--flash-freq', '80m', '--flash-size', '32MB') }))
         if (($arduinoOptions -join ' ') -ne '--flash_mode dio --flash_freq 80m --flash_size 32MB') { throw 'SelfTest did not normalize Arduino hyphen flash options.' }
         try { Get-FlashOptions ([pscustomobject]@{ esptool_options = @('--before', 'default-reset') }) | Out-Null; throw 'SelfTest accepted unsafe options.' } catch { if ($_.Exception.Message -eq 'SelfTest accepted unsafe options.') { throw } }
         try { Get-FlashOptions ([pscustomobject]@{ esptool_options = @('--flash-mode', 'dio', '--flash_mode', 'qio') }) | Out-Null; throw 'SelfTest accepted duplicate flash-option aliases.' } catch { if ($_.Exception.Message -eq 'SelfTest accepted duplicate flash-option aliases.') { throw } }
-        $pendingLast = Get-StateForFinalSha ([pscustomobject]@{ FinalSha = 'expected'; CurrentIndex = 52; ConfirmedIndexes = @(1..51) }) 'expected' '' 52
-        $completedLast = Get-StateForFinalSha ([pscustomobject]@{ FinalSha = 'expected'; CurrentIndex = 52; ConfirmedIndexes = @(1..52) }) 'expected' '' 52
-        if (@($pendingLast.ConfirmedIndexes).Count -ne 51 -or @($completedLast.ConfirmedIndexes).Count -ne 52) { throw 'SelfTest rejected a valid final-item state.' }
-        try { Get-StateForFinalSha ([pscustomobject]@{ FinalSha = 'expected'; CurrentIndex = 52; ConfirmedIndexes = @(52) }) 'expected' '' 52 | Out-Null; throw 'SelfTest accepted an invalid saved state.' } catch { if ($_.Exception.Message -eq 'SelfTest accepted an invalid saved state.') { throw } }
-        if (@(Select-CompatibleItems $Items 'rev1_3').Count -ne 1 -or @(Select-CompatibleItems $Items 'rev3_x').Count -ne 51) { throw 'SelfTest profile selection contract failed.' }
+        $pendingLast = Get-StateForFinalSha ([pscustomobject]@{ FinalSha = 'expected'; CurrentIndex = 62; ConfirmedIndexes = @(1..61) }) 'expected' '' 62
+        $completedLast = Get-StateForFinalSha ([pscustomobject]@{ FinalSha = 'expected'; CurrentIndex = 62; ConfirmedIndexes = @(1..62) }) 'expected' '' 62
+        if (@($pendingLast.ConfirmedIndexes).Count -ne 61 -or @($completedLast.ConfirmedIndexes).Count -ne 62) { throw 'SelfTest rejected a valid final-item state.' }
+        try { Get-StateForFinalSha ([pscustomobject]@{ FinalSha = 'expected'; CurrentIndex = 62; ConfirmedIndexes = @(62) }) 'expected' '' 62 | Out-Null; throw 'SelfTest accepted an invalid saved state.' } catch { if ($_.Exception.Message -eq 'SelfTest accepted an invalid saved state.') { throw } }
+        try { Select-CompatibleItems $Items 'rev1_3' | Out-Null; throw 'SelfTest accepted unsupported pre-v3 silicon.' } catch { if ($_.Exception.Message -eq 'SelfTest accepted unsupported pre-v3 silicon.') { throw } }
+        if (@(Select-CompatibleItems $Items 'rev3_x').Count -ne 62) { throw 'SelfTest profile selection contract failed.' }
         $parsedPreV3 = ConvertFrom-ESP32P4ChipIdOutput 'Chip is ESP32-P4 (revision v1.3)'
         $parsedV3 = ConvertFrom-ESP32P4ChipIdOutput 'Chip is ESP32-P4 (revision v3.2)'
         if ($parsedPreV3.ProfileId -ne 'rev1_3' -or $parsedV3.ProfileId -ne 'rev3_x') { throw 'SelfTest chip revision parser contract failed.' }
@@ -682,10 +683,10 @@ if ($SelfTest -or $ListOnly) {
         } finally {
             if (Test-Path -LiteralPath $selfTestRoot) { Remove-Item -LiteralPath $selfTestRoot -Recurse -Force }
         }
-        Write-Output 'SELF_TEST_OK items=52 esp_idf=40 arduino=10 maintained_firmware=2 no_network_no_serial_no_flash'
+        Write-Output 'SELF_TEST_OK items=62 esp_idf=40 arduino=20 maintained_firmware=2 no_network_no_serial_no_flash'
         return
     }
-    Write-Output 'LIST_ONLY items=52 esp_idf=40 arduino=10 maintained_firmware=2 no_network_no_serial_no_flash'
+    Write-Output 'LIST_ONLY items=62 esp_idf=40 arduino=20 maintained_firmware=2 no_network_no_serial_no_flash'
     foreach ($item in $Items) { Write-Output ('{0}: workflow={1} artifact_key={2} artifact_suffix=HEAD12 source_type={3} project={4} configuration={5} variant={6} profile={7}' -f $item.Index, $item.Workflow, $item.ArtifactKey, $item.SourceType, $item.Project, $item.Configuration, $item.VariantId, $item.ProfileId) }
     return
 }

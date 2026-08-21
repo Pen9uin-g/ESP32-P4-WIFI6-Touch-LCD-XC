@@ -38,8 +38,8 @@ Generated directories such as `build/`, `managed_components/`,
 
 The ESP-IDF examples under `examples/esp-idf/` are the default product build
 surface. The `firmware/` tree is maintained separately and remains outside the
-default example matrix unless a future maintainer explicitly creates a
-firmware-specific workflow.
+default example matrix. Its dedicated workflow builds only the rev3.x `3_4c`
+and `4c` display profiles; see [Firmware Source Boundary](FIRMWARE.md).
 
 ## Example Documentation
 

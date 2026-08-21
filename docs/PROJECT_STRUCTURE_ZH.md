@@ -35,8 +35,9 @@
 `build/`、`managed_components/`、`dependencies.lock` 和本地 `sdkconfig` 等
 生成目录不应提交。
 
-`examples/esp-idf/` 是默认产品构建面。`firmware/` 单独维护，除非维护者明确
-建立固件专用工作流，否则不会进入默认示例矩阵。
+`examples/esp-idf/` 是默认产品构建面。`firmware/` 单独维护，不会进入默认示例
+矩阵；其专用工作流只构建 rev3.x 的 `3_4c` 和 `4c` 显示 profile，详见
+[固件源码边界](FIRMWARE_ZH.md)。
 
 ## 示例文档
 

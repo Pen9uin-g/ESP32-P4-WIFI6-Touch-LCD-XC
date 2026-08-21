@@ -4,7 +4,7 @@
 
 ## 适用范围
 
-本指南适用于 `examples/arduino/examples/` 下的 5 个一方示例。它们使用
+本指南适用于 `examples/arduino/examples/` 下的 10 个一方示例。它们使用
 Arduino-ESP32 `3.3.11` 和 [Arduino 说明](../examples/arduino/README_ZH.md)
 记录的精确 FQBN 构建。请按实际产品选择对应的 3.4C 或 4C 显示版本。
 

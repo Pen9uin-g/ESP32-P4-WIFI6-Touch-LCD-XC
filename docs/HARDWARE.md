@@ -32,13 +32,13 @@ board-facing change is made.
 
 | Interface | Static contract and boundary |
 | --- | --- |
-| Display | 3.4C uses `BSP_LCD_TYPE_800_800_3_4_INCH`, 4C uses `BSP_LCD_TYPE_720_720_4_INCH`; both use the MIPI-DSI display path. LCD reset is GPIO27 and backlight PWM is GPIO26. |
+| Display | 3.4C uses `BSP_LCD_TYPE_800_800_3_4_INCH`, 4C uses `BSP_LCD_TYPE_720_720_4_INCH`; both use two MIPI-DSI lanes at 1,500 Mbps/lane with an 80 MHz DPI clock. LCD reset is GPIO27 and backlight PWM is GPIO26. |
 | I2C | SDA is GPIO7 and SCL is GPIO8. |
 | Touch | The official controller is GT9271; the software uses a GT911-compatible driver/API. `TP_RST`/`CTP_RESET` reaches GPIO23 through 0-ohm R62, while `TP_INT`/`CTP_INT` reaches only TP2 with no MCU route. Software deliberately leaves both pins `GPIO_NUM_NC`, installs no ISR, probes `0x5D` then `0x14`, and polls with `esp_lcd_touch_read_data()`. Leaving reset unconfigured avoids changing the address/reset strap behavior. |
 | microSD | SD D0..D3 use GPIO39..GPIO42, CLK GPIO43, and CMD GPIO44; this matches the BSP contract. |
 | Audio | ES8311/ES7210 use I2S GPIO9..GPIO13 and PA enable GPIO53; this matches the BSP contract. |
 | Memory | ESP32-P4NRW32 has 32 MB in-package PSRAM and the GD25Q256 provides 32 MB flash; this matches the configured memory profile. |
-| Processor, wireless, and revisions | The schematic identifies the ESP32-P4 and ESP32-C6 board design. Its board revision is rev1.1. `rev1_3` and `rev3_x` are ESP32-P4 silicon compatibility profiles, not PCB revisions; do not infer a board revision from either profile. |
+| Processor, wireless, and revisions | The schematic identifies the ESP32-P4 and ESP32-C6 board design. Its board revision is rev1.1. `rev1_3` and `rev3_x` are ESP32-P4 silicon compatibility profiles, not PCB revisions. Pre-v3 selects the legacy PLL_F20M DSI PHY reference; rev3.x selects XTAL. `.phy_clk_src = 0` lets ESP-IDF choose this source while preserving the 80 MHz DPI clock. |
 
 ## Audit rules for future changes
 
@@ -49,7 +49,10 @@ Before changing a hardware constant or board-facing README:
    `sdkconfig.defaults`, and example source.
 3. Check both display resolutions and both Arduino `CURRENT_SCREEN` variants when
    the change affects the display path.
-4. Record whether validation is static (source/schematic) or includes a physical
+4. Keep the PHY reference source profile-dependent: never force the legacy
+   PLL_F20M source for a rev3.x build. Arduino and the managed BSP use the
+   automatic selection path.
+5. Record whether validation is static (source/schematic) or includes a physical
    board test. A successful CI build proves compilation, not pin correctness.
 
 The managed BSP remains at published `3.0.1`, which already provides the

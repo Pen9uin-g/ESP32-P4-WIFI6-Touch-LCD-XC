@@ -216,7 +216,7 @@ class SerialLogTests(unittest.TestCase):
 
     def test_first_party_sketches_use_helper_without_serial_waits(self) -> None:
         sketches = sorted(SKETCH_ROOT.rglob("*.ino"))
-        self.assertEqual(5, len(sketches))
+        self.assertEqual(10, len(sketches))
 
         for sketch in sketches:
             with self.subTest(sketch=sketch.relative_to(ROOT).as_posix()):
@@ -232,7 +232,7 @@ class SerialLogTests(unittest.TestCase):
                 self.assertIsNone(DIRECT_LOG.search(code))
                 self.assertIsNone(SERIAL_REFERENCE.search(code))
 
-        lvgl = (SKETCH_ROOT / "LVGLV9_Arduino" / "LVGLV9_Arduino.ino").read_text(
+        lvgl = (SKETCH_ROOT / "04_LVGLV9_Arduino" / "04_LVGLV9_Arduino.ino").read_text(
             encoding="utf-8"
         )
         self.assertRegex(

@@ -43,8 +43,8 @@ MIPI-DSI 触控屏，适合用于图形化人机交互、多媒体应用、边�
 | 应用处理器 | ESP32-P4NRW32，双核高性能 RISC-V 最高 360 MHz，低功耗 RISC-V 核最高 40 MHz |
 | 存储 | 封装内置 32 MB PSRAM，板载 32 MB NOR Flash |
 | 无线连接 | ESP32-C6-MINI-1 通过 SDIO 提供 2.4 GHz Wi-Fi 6 和 Bluetooth 5 (LE) |
-| 显示 | 2-lane MIPI-DSI 圆形 IPS LCD；3.4 英寸 800 × 800 或 4 英寸 720 × 720 |
-| 触控 | 官方硬件采用 GT9271 电容触控控制器；示例使用托管的 GT911 兼容驱动/API |
+| 显示 | 2-lane MIPI-DSI 圆形 IPS LCD；3.4 英寸 800 × 800 或 4 英寸 720 × 720。两种屏均为 1,500 Mbps/lane 和 80 MHz DPI 时钟。 |
+| 触控 | 官方硬件采用 GT9271 电容触控控制器；示例使用带地址探测和轮询的托管 GT911 兼容驱动/API。 |
 | 摄像头 | 2-lane MIPI-CSI 摄像头接口 |
 | 音频 | ES8311 音频编解码器、ES7210 音频 ADC、板载麦克风和 8 Ω / 2 W 扬声器接口 |
 | 存储卡与 USB | SDIO 3.0 microSD 卡槽和 USB 2.0 OTG High-Speed |
@@ -62,6 +62,10 @@ CI 使用 ESP-IDF `v5.5.5` 和 `v6.0.2` 测试全部一方 ESP-IDF 工程。
 使用 250 MHz，对应 Arduino FQBN 使用 `ChipVariant=postv3`。`rev1_3` 是面向 pre-v3
 芯片的显式兼容配置，会把已启用的 PSRAM 限制为 200 MHz，不是第二套默认示例矩阵。`rev1_3` 与 `rev3_x`
 的二进制文件不能互换。这些是芯片 profile，不是 PCB 版本，不能据此判断开发板版本。
+
+DSI PHY 参考时钟方面，pre-v3 使用旧版 PLL_F20M，rev3.x 使用 XTAL。托管 BSP
+通过 `.phy_clk_src = 0` 让 ESP-IDF 按芯片 profile 自动选择；Arduino 显示适配器也
+遵循同一套 rev3.x 安全选择。切换 PHY 参考源时不要改动 80 MHz DPI 时钟。
 
 ```bash
 cd examples/esp-idf/02_HelloWorld
@@ -102,11 +106,16 @@ idf.py -p PORT flash monitor
 
 | 示例 | 功能 |
 | --- | --- |
-| [HelloWorld](examples/arduino/examples/HelloWorld/) | 显示屏启动 |
-| [AsciiTable](examples/arduino/examples/AsciiTable/) | 文本与字符渲染 |
-| [Drawing_board](examples/arduino/examples/Drawing_board/) | 电容触控画板 |
-| [GFX_ESPWiFiAnalyzer](examples/arduino/examples/GFX_ESPWiFiAnalyzer/) | Wi-Fi 扫描与信道可视化 |
-| [LVGLV9_Arduino](examples/arduino/examples/LVGLV9_Arduino/) | LVGL 9 显示与触控 |
+| [01_HelloWorld](examples/arduino/examples/01_HelloWorld/) | 显示屏启动 |
+| [02_AsciiTable](examples/arduino/examples/02_AsciiTable/) | 文本与字符渲染 |
+| [03_Drawing_board](examples/arduino/examples/03_Drawing_board/) | 电容触控画板 |
+| [04_LVGLV9_Arduino](examples/arduino/examples/04_LVGLV9_Arduino/) | LVGL 9 显示与触控 |
+| [05_GFX_ESPWiFiAnalyzer](examples/arduino/examples/05_GFX_ESPWiFiAnalyzer/) | Wi-Fi 扫描与信道可视化 |
+| [06_Camera_Preview](examples/arduino/examples/06_Camera_Preview/) | 摄像头预览 |
+| [07_Camera_ISP_Tuning](examples/arduino/examples/07_Camera_ISP_Tuning/) | 摄像头 ISP 调节 |
+| [08_SD_Card](examples/arduino/examples/08_SD_Card/) | microSD 卡访问 |
+| [09_Audio_Playback](examples/arduino/examples/09_Audio_Playback/) | ES8311 音频播放 |
+| [10_Mic_Record](examples/arduino/examples/10_Mic_Record/) | ES7210 麦克风采集 |
 
 配套库位于
 [`examples/arduino/libraries`](examples/arduino/libraries/)，其中上游库自带的示例
@@ -119,13 +128,13 @@ idf.py -p PORT flash monitor
 | --- | --- |
 | 仓库自检 | 文档、工程结构与一方 Arduino 示例目录 |
 | ESP-IDF | 12 个一方工程 × ESP-IDF `v5.5.5`/`v6.0.2`：01–06 在每个 ESP-IDF 版本各构建一个共享的非显示配置（12 个任务），07–11 同时构建 3.4C 与 4C 显示配置（20 个任务），USB 同时构建双显示配置及 default/vendor-only 配置（8 个任务）；完整路由共 40 个任务 |
-| Arduino | 5 个一方 `rev3_x` 示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置（10 个任务） |
-| 维护固件 | `firmware/brookesia` 的两个 ESP-IDF `v5.5.5` P4-only 产物：`rev1_3` 和 `rev3_x`；固件默认使用 3.4C |
+| Arduino | 10 个一方 `rev3_x` 示例，Arduino-ESP32 `3.3.11`，同时编译 3.4C 与 4C 配置（20 个任务） |
+| 维护固件 | `firmware/brookesia` 的两个 ESP-IDF `v5.5.5` P4-only、rev3.x 产物：`3_4c`（800 × 800）和 `4c`（720 × 720） |
 
 每个 Pull Request 都会得到可见的策略、ESP-IDF 路由和 Arduino 路由结论。纯文档
 改动会跳过产品构建；源码或共享构建输入只选择受影响矩阵；未知路径会先保守选择
-双完整矩阵，再使策略检查失败。`firmware/` 下维护中的源码工程会选择单独的双 profile
-固件工作流，但不会进入默认示例矩阵；完整产物集合共 52 项（40 ESP-IDF 示例 + 10 Arduino
+双完整矩阵，再使策略检查失败。`firmware/` 下维护中的源码工程会选择单独的双显示 profile
+固件工作流，但不会进入默认示例矩阵；配置后的完整产物集合共 62 项（40 ESP-IDF 示例 + 20 Arduino
 示例 + 2 维护固件）。配套库自带的上游示例不会进入发现矩阵。详细行为请参阅
 [持续集成说明](docs/CI_ZH.md)。
 

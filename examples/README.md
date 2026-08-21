@@ -29,6 +29,23 @@ Arduino notes are maintained in [arduino/README.md](arduino/README.md). The
 Arduino tree includes bundled libraries used by the board examples, including
 LVGL and Arduino_GFX.
 
+| Sketch | Area |
+| --- | --- |
+| `01_HelloWorld` | Display bring-up |
+| `02_AsciiTable` | Text rendering |
+| `03_Drawing_board` | GT911 polling drawing |
+| `04_LVGLV9_Arduino` | LVGL 9 display and touch |
+| `05_GFX_ESPWiFiAnalyzer` | Wi-Fi scan visualization |
+| `06_Camera_Preview` | Camera preview |
+| `07_Camera_ISP_Tuning` | Camera ISP controls |
+| `08_SD_Card` | microSD access |
+| `09_Audio_Playback` | ES8311 playback |
+| `10_Mic_Record` | ES7210 recording |
+
+All 10 sketches have 3.4C and 4C build variants. The Arduino display adapter
+uses the rev3.x-safe DSI PHY source selection; the display DPI clock remains
+80 MHz for both panels.
+
 ## Adding A Project
 
 New ESP-IDF projects should be self-contained and build independently with:

@@ -40,11 +40,11 @@ class RouterTests(unittest.TestCase):
     def test_inventory_and_complete_matrix_sizes(self) -> None:
         self.assertEqual("rev3_x", router.DEFAULT_PROFILE_ID)
         self.assertEqual(12, len(self.idf))
-        self.assertEqual(5, len(self.arduino))
+        self.assertEqual(10, len(self.arduino))
         matrix = router.idf_matrix(sorted(self.idf))["include"]
         self.assertEqual(40, len(matrix))
         arduino_matrix = router.arduino_matrix(sorted(self.arduino))["include"]
-        self.assertEqual(10, len(arduino_matrix))
+        self.assertEqual(20, len(arduino_matrix))
         self.assertEqual(40, len({entry["artifact_key"] for entry in matrix}))
         self.assertEqual({"rev3_x"}, {entry["profile_id"] for entry in matrix})
         self.assertEqual({"rev3_x"}, {entry["profile_id"] for entry in arduino_matrix})
@@ -56,7 +56,12 @@ class RouterTests(unittest.TestCase):
         self.assertEqual(2, len(firmware))
         self.assertEqual(2, len({entry["build_dir"] for entry in firmware}))
         self.assertEqual(2, len({entry["sdkconfig"] for entry in firmware}))
-        self.assertEqual({"rev1_3", "rev3_x"}, {entry["profile_id"] for entry in firmware})
+        self.assertEqual({"rev3_x"}, {entry["profile_id"] for entry in firmware})
+        self.assertEqual({"3_4c", "4c"}, {entry["variant_id"] for entry in firmware})
+        self.assertEqual({"3.4C", "4C"}, {entry["variant"] for entry in firmware})
+        self.assertEqual({"800x800", "720x720"}, {entry["resolution"] for entry in firmware})
+        self.assertTrue(all("sdkconfig.defaults.rev3_x" in entry["sdkconfig_defaults"] for entry in firmware))
+        self.assertTrue(all("sdkconfig.defaults." + entry["variant_id"] in entry["sdkconfig_defaults"] for entry in firmware))
 
     def test_phone_matrix_has_34c_and_4c_variants(self) -> None:
         entries = router.idf_matrix([router.PHONE_PROJECT])["include"]
@@ -137,7 +142,7 @@ class RouterTests(unittest.TestCase):
     def test_parse_name_status_preserves_both_rename_sides(self) -> None:
         changes = router.parse_name_status_z(
             "R100\0examples/esp-idf/01_HowToCreateProject/old.c\0docs/new.md\0"
-            "D\0examples/arduino/examples/HelloWorld/HelloWorld.ino\0"
+            "D\0examples/arduino/examples/01_HelloWorld/01_HelloWorld.ino\0"
         )
         self.assertEqual("R100", changes[0].status)
         self.assertEqual(2, len(changes[0].paths))
@@ -176,7 +181,7 @@ class RouterTests(unittest.TestCase):
         route = router.route_changes(
             [
                 router.Change("M", ("examples/esp-idf/02_HelloWorld/README.md",)),
-                router.Change("M", ("examples/arduino/examples/HelloWorld/README.md",)),
+                router.Change("M", ("examples/arduino/examples/01_HelloWorld/README.md",)),
                 router.Change("M", ("examples/arduino/libraries/display/README.md",)),
             ],
             self.idf,
@@ -188,11 +193,11 @@ class RouterTests(unittest.TestCase):
 
     def test_direct_source_changes_select_only_affected_items(self) -> None:
         project = "examples/esp-idf/02_HelloWorld"
-        sketch = "examples/arduino/examples/HelloWorld"
+        sketch = "examples/arduino/examples/01_HelloWorld"
         route = router.route_changes(
             [
                 router.Change("M", (project + "/main/main.c",)),
-                router.Change("M", (sketch + "/HelloWorld.ino",)),
+                router.Change("M", (sketch + "/01_HelloWorld.ino",)),
             ],
             self.idf,
             self.arduino,
@@ -261,7 +266,7 @@ class RouterTests(unittest.TestCase):
                 )
                 self.assertEqual(40, len(router.idf_matrix(route["idf_projects"])["include"]))
                 self.assertEqual(
-                    10,
+                    20,
                     len(router.arduino_matrix(route["arduino_sketches"])["include"]),
                 )
                 self.assertEqual(
@@ -331,17 +336,22 @@ class RouterTests(unittest.TestCase):
         self.assertTrue(route["firmware_selected"])
         self.assertEqual(2, len(router.firmware_matrix(True)["include"]))
 
-    def test_maintained_firmware_build_wrapper_is_profile_safe(self) -> None:
+    def test_maintained_firmware_build_wrapper_is_rev3_panel_safe(self) -> None:
         workflow = FIRMWARE_WORKFLOW.read_text(encoding="utf-8")
         script = FIRMWARE_BUILD_SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("bash ../../.github/scripts/build_maintained_firmware.sh '${{ matrix.profile_id }}'", workflow)
-        self.assertIn("rev1_3|rev3_x", script)
-        self.assertIn('export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.$profile_id"', script)
-        self.assertIn('sdkconfig_path="$(pwd)/sdkconfig.ci.generated-$profile_id"', script)
+        self.assertIn("command: ${{ matrix.command }}", workflow)
+        firmware = router.firmware_matrix(True)["include"]
+        self.assertTrue(all(entry["command"].endswith(entry["variant_id"]) for entry in firmware))
+        self.assertIn("rev3_x)", script)
+        self.assertNotIn("rev1_3|rev3_x", script)
+        self.assertIn('export SDKCONFIG_DEFAULTS="sdkconfig.defaults;sdkconfig.defaults.$profile_id;sdkconfig.defaults.$variant_id"', script)
+        self.assertIn('sdkconfig_path="$(pwd)/sdkconfig.ci.generated-$variant_id-$profile_id"', script)
         self.assertIn(
-            'exec idf.py -B "build-$profile_id" -D "SDKCONFIG=$sdkconfig_path" build',
+            'exec idf.py -B "build-$variant_id-$profile_id" -D "SDKCONFIG=$sdkconfig_path" build',
             script,
         )
+        self.assertIn('--variant "${{ matrix.variant }}" --variant-id "${{ matrix.variant_id }}"', workflow)
+        self.assertIn('--resolution "${{ matrix.resolution }}"', workflow)
 
     def test_unknown_path_is_conservative_and_reported(self) -> None:
         route = router.route_changes(

@@ -49,9 +49,9 @@ Component Manager 的
   `rev1_3` 兼容 profile。
 - 示例 08 以 `^9.*` 接受 LVGL v9；示例 12 与 Brookesia 面使用 LVGL
   `9.5.0`。只有两个显示变体都通过编译、UI、显示与触控回归后，才调整这些约定。
-- 维护固件中的宽泛通配依赖属于跟随解析器的源码构建输入，不是可复现的发布固定项。
-  发布任何交付物前，应记录解析后的版本与校验和，并验证 `rev1_3` 和 `rev3_x`
-  两个固件 profile。
+- 维护固件使用已发布的 XC BSP `3.0.1`，并且只构建 `3_4c` 和 `4c` 两个 rev3.x
+  显示 profile。发布任何交付物前，应记录解析后的组件版本并验证对应的 profile
+  构建；其 manifest 不得替换为未发布、Git 或本地路径组件。
 
 ## 产品或示例本地组件
 
@@ -64,7 +64,7 @@ Component Manager 的
 | `examples/esp-idf/12_usb_extend_screen/components/bsp_extra` | USB/显示示例专用的板级 glue |
 
 `firmware/brookesia/components/` 是单独维护的固件源码面。其 BSP 使用者同样固定为
-`3.0.1`，两个 revision profile 与未改变的示例矩阵分开构建。
+`3.0.1`，`3_4c` 和 `4c` 两个 rev3.x 显示 profile 与未改变的示例矩阵分开构建。
 
 如果可复用的修复应当进入 Waveshare 共享组件仓库，应先获得上游修改和发布新依赖
 版本的授权。未经原理图和两个显示变体核对，不要静默用共享组件替换本地板级 glue。

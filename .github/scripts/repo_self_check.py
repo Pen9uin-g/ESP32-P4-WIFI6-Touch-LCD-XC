@@ -52,6 +52,13 @@ REQUIRED_FILES = (
     Path("docs/TROUBLESHOOTING.md"),
     Path("examples/README.md"),
     Path("examples/arduino/README.md"),
+    Path("examples/arduino/libraries/GFX_Library_for_Arduino/library.properties"),
+    Path("examples/arduino/libraries/displays/library.properties"),
+    Path("examples/arduino/libraries/displays/displays_config.h"),
+    Path("examples/arduino/libraries/displays/gt911.h"),
+    Path("examples/arduino/libraries/displays/serial_log.h"),
+    Path("examples/arduino/libraries/lv_conf.h"),
+    Path("examples/arduino/libraries/lvgl/library.properties"),
     Path(".github/scripts/audit_markdown.py"),
     Path(".github/scripts/build_maintained_firmware.sh"),
     Path(".github/scripts/ci_change_router.py"),
@@ -74,8 +81,10 @@ REQUIRED_FILES = (
     Path(".github/workflows/maintained-firmware.yml"),
     Path("Flash-CI-Firmware.cmd"),
     Path("scripts/Flash-CI-Firmware.ps1"),
-    Path("firmware/brookesia/sdkconfig.defaults.rev1_3"),
+    Path("firmware/brookesia/sdkconfig.defaults"),
     Path("firmware/brookesia/sdkconfig.defaults.rev3_x"),
+    Path("firmware/brookesia/sdkconfig.defaults.3_4c"),
+    Path("firmware/brookesia/sdkconfig.defaults.4c"),
     Path("CONTRIBUTING.md"),
     Path("CONTRIBUTING_ZH.md"),
     Path("SUPPORT.md"),
@@ -212,6 +221,49 @@ def check_managed_bsp(errors: list[str]) -> None:
         errors.append(f"Expected exactly 7 managed BSP manifests, found {len(bsp_manifests)}")
 
 
+def check_firmware_defaults(errors: list[str]) -> None:
+    """Keep the maintained firmware rev3.x-only and panel-explicit."""
+    root = Path("firmware/brookesia")
+    rev3_required = (
+        "CONFIG_ESP32P4_REV_MIN_300=y",
+        "CONFIG_SPIRAM_SPEED_250M=y",
+        "CONFIG_SPIRAM_SPEED=250",
+    )
+    rev3_forbidden = (
+        "CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y",
+        "CONFIG_ESP32P4_REV_MIN_100=y",
+        "CONFIG_SPIRAM_SPEED_200M=y",
+        "CONFIG_SPIRAM_SPEED=200",
+    )
+    for name in ("sdkconfig.defaults", "sdkconfig.defaults.rev3_x"):
+        path = root / name
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if any(value not in text for value in rev3_required) or any(
+            value in text for value in rev3_forbidden
+        ):
+            errors.append(f"Invalid maintained-firmware rev3_x defaults: {path.as_posix()}")
+
+    panel_expectations = {
+        "sdkconfig.defaults.3_4c": (
+            "CONFIG_BSP_LCD_TYPE_800_800_3_4_INCH=y",
+            "# CONFIG_BSP_LCD_TYPE_720_720_4_INCH is not set",
+        ),
+        "sdkconfig.defaults.4c": (
+            "CONFIG_BSP_LCD_TYPE_720_720_4_INCH=y",
+            "# CONFIG_BSP_LCD_TYPE_800_800_3_4_INCH is not set",
+        ),
+    }
+    for name, expected in panel_expectations.items():
+        path = root / name
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8")
+        if any(value not in text for value in expected):
+            errors.append(f"Invalid maintained-firmware panel defaults: {path.as_posix()}")
+
+
 def check_example_index(projects: list[Path], errors: list[str]) -> None:
     index = Path("examples/README.md")
     if not index.is_file():
@@ -238,8 +290,8 @@ def check_arduino_sketches(errors: list[str]) -> list[Path]:
     if not sketch_dirs:
         errors.append("No first-party Arduino sketches discovered")
         return []
-    if len(sketch_dirs) != 5:
-        errors.append(f"Expected exactly 5 first-party Arduino sketches, found {len(sketch_dirs)}")
+    if len(sketch_dirs) != 10:
+        errors.append(f"Expected exactly 10 first-party Arduino sketches, found {len(sketch_dirs)}")
 
     sketches: list[Path] = []
     for sketch_dir in sketch_dirs:
@@ -262,6 +314,7 @@ def main() -> int:
     check_gitignore(errors)
     projects = check_projects(errors)
     check_managed_bsp(errors)
+    check_firmware_defaults(errors)
     check_example_index(projects, errors)
     sketches = check_arduino_sketches(errors)
 

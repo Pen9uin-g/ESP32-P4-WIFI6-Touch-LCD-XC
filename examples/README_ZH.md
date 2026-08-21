@@ -28,6 +28,22 @@ Arduino 说明位于[Arduino 说明](arduino/README_ZH.md)。Arduino 目录还�
 示例使用的 LVGL 和 Arduino_GFX 等内置库；这些库自己的上游示例不会进入产品
 CI 矩阵。
 
+| 示例 | 方向 |
+| --- | --- |
+| `01_HelloWorld` | 显示屏启动 |
+| `02_AsciiTable` | 文本渲染 |
+| `03_Drawing_board` | GT911 轮询画板 |
+| `04_LVGLV9_Arduino` | LVGL 9 显示与触控 |
+| `05_GFX_ESPWiFiAnalyzer` | Wi-Fi 扫描可视化 |
+| `06_Camera_Preview` | 摄像头预览 |
+| `07_Camera_ISP_Tuning` | 摄像头 ISP 调节 |
+| `08_SD_Card` | microSD 访问 |
+| `09_Audio_Playback` | ES8311 播放 |
+| `10_Mic_Record` | ES7210 录音 |
+
+这 10 个示例均有 3.4C 和 4C 构建变体。Arduino 显示适配器使用 rev3.x 安全的
+DSI PHY 源选择；两种屏幕的显示 DPI 时钟保持为 80 MHz。
+
 ## 添加工程
 
 新的 ESP-IDF 示例应能独立运行：

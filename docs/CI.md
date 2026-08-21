@@ -33,7 +33,7 @@ python .github/scripts/audit_markdown.py . --all --config .github/scripts/markdo
 
 On pull requests, the Markdown command uses the base SHA instead of `--all`.
 The self-check verifies required documentation and workflows, generated-output
-ignore rules, all 12 direct ESP-IDF projects, all 5 direct Arduino sketches,
+ignore rules, all 12 direct ESP-IDF projects, all 10 direct Arduino sketches,
 and the example index.
 
 For every first-party English/Chinese Markdown companion pair, the local policy
@@ -69,10 +69,10 @@ fallback selects both complete product matrices.
 
 `firmware/brookesia` is a separately maintained delivery/source surface. It is
 not treated as another example. When its route is selected, its dedicated
-workflow builds exactly two independent ESP-IDF `v5.5.5`, 32 MB P4 artifacts:
-3.4C-default `rev1_3` and `rev3_x`. The profiles are incompatible binaries;
-the example matrix is not doubled and defaults to `rev3_x` only. The C6 Hosted
-image is a runtime dependency, not a C6 binary in these artifacts.
+workflow is configured to build two independent ESP-IDF `v5.5.5`, 32 MB,
+rev3.x P4 display artifacts: `3_4c` (800 × 800) and `4c` (720 × 720). It does
+not build a `rev1_3` firmware image. The C6 Hosted image is a runtime
+dependency, not a C6 binary in these artifacts.
 
 ## ESP-IDF matrix
 
@@ -118,7 +118,7 @@ sketch builds for both displays:
 | Display variants | 3.4C (`SCREEN_3INCH_4_DSI`), 4C (`SCREEN_4INCH_DSI`) |
 | Bundled libraries | `examples/arduino/libraries/` |
 
-A complete route is 5 sketches times 2 display variants, or 10 build jobs.
+A complete route is 10 sketches times 2 display variants, or 20 build jobs.
 Manual runs accept `sketch=all`, a sketch name, or a full sketch path.
 
 ## Downloadable example artifacts
@@ -153,6 +153,8 @@ BSP. The flash helpers require a port and accept an optional baud rate; they do
 not erase flash or write a padded whole-flash image. See
 [Arduino segmented flashing](ARDUINO_FLASHING.md) for verification and HIL.
 
-Artifacts are example-build diagnostics, not hardware validation or factory
-firmware. Releases remain manual/deferred, and the separately maintained
-`firmware/` delivery surface remains separate.
+Artifacts are build diagnostics, not hardware validation. Firmware profile
+builds are expected to produce the named FactoryOnly combine-bin candidates
+documented in [Firmware Source Boundary](FIRMWARE.md); compilation or packaging
+does not establish HIL. Releases remain manual/deferred, and the separately
+maintained `firmware/` delivery surface remains separate.

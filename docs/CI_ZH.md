@@ -30,7 +30,7 @@ python .github/scripts/audit_markdown.py . --all --config .github/scripts/markdo
 ```
 
 Pull Request 的 Markdown 检查会把 `--all` 换成 base SHA。仓库自检会验证必需文档
-和工作流、生成物忽略规则、12 个直接 ESP-IDF 工程、5 个直接 Arduino 示例以及
+和工作流、生成物忽略规则、12 个直接 ESP-IDF 工程、10 个直接 Arduino 示例以及
 示例索引。
 
 对于每一组一方英文/中文 Markdown 配对，本地策略门禁要求两页顶部附近都含有互相
@@ -62,9 +62,9 @@ python .github/scripts/ci_change_router.py --base-ref <base-sha> --head-ref <hea
 | 未分类的非文档路径 | 双完整矩阵并使严格策略失败 |
 
 `firmware/brookesia` 是单独维护的交付/源码面，不会被当作另一个示例。路由选中时，
-专用工作流只构建两个独立的 ESP-IDF `v5.5.5`、32 MB、P4 产物：默认 3.4C 的
-`rev1_3` 和 `rev3_x`。两者二进制不兼容；示例不会为 `rev3_x` 翻倍，默认只使用
-`rev3_x`。C6 Hosted 镜像是运行时依赖，不是这些产物内的 C6 二进制文件。
+专用工作流会配置为构建两个独立的 ESP-IDF `v5.5.5`、32 MB、rev3.x P4 显示产物：
+`3_4c`（800 × 800）和 `4c`（720 × 720）。它不构建 `rev1_3` 固件镜像。C6 Hosted
+镜像是运行时依赖，不是这些产物内的 C6 二进制文件。
 
 ## ESP-IDF 矩阵
 
@@ -105,7 +105,7 @@ UAC 音频，并在依赖解析阶段省略托管 UAC 组件。
 | 显示变体 | 3.4C（`SCREEN_3INCH_4_DSI`）、4C（`SCREEN_4INCH_DSI`） |
 | 内置库 | `examples/arduino/libraries/` |
 
-完整路由为 5 个示例乘以 2 个显示变体，共 10 个构建任务。手动运行可以使用
+完整路由为 10 个示例乘以 2 个显示变体，共 20 个构建任务。手动运行可以使用
 `sketch=all`、示例名或完整示例路径。
 
 ## 可下载示例构建产物
@@ -133,5 +133,6 @@ manifest 会记录完整产品提交 SHA、目标、FQBN、显示/分辨率、�
 参数，不会擦除 Flash，也不会写入填充后的整片镜像。验证与 HIL 步骤请参阅
 [Arduino 分段烧录](ARDUINO_FLASHING_ZH.md)。
 
-这些文件是示例构建诊断产物，不代表硬件验证或工厂固件；Release 仍为手动/延后
-流程，单独维护的 `firmware/` 交付面保持独立。
+这些文件是构建诊断产物，不代表硬件验证。固件 profile 构建预期产生
+[固件源码边界](FIRMWARE_ZH.md)中命名的 FactoryOnly combine bin 候选；编译或打包
+不构成 HIL。Release 仍为手动/延后流程，单独维护的 `firmware/` 交付面保持独立。

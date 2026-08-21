@@ -59,10 +59,11 @@ and this repository also validates ESP-IDF 5.5; see the Component Manager's
 - Example 08 accepts LVGL v9 with `^9.*`; example 12 and the Brookesia surfaces
   use LVGL `9.5.0`. Move these contracts only after compile, UI, display and
   touch regression checks on both display variants.
-- The maintained firmware's broad wildcard dependencies are resolver-tracking
-  source-build inputs, not reproducible release pins. Before publishing any
-  delivery artifact, record the resolved versions and checksums and validate
-  both `rev1_3` and `rev3_x` firmware profiles.
+- The maintained firmware uses the published XC BSP `3.0.1` and builds only
+  its `3_4c` and `4c` rev3.x display profiles. Before publishing a delivery
+  artifact, record the resolved component versions and validate the matching
+  profile-specific build; do not substitute unpublished, Git, or local-path
+  components in its manifests.
 
 ## Product-local or example-local components
 
@@ -75,8 +76,8 @@ and this repository also validates ESP-IDF 5.5; see the Component Manager's
 | `examples/esp-idf/12_usb_extend_screen/components/bsp_extra` | USB/display example-specific board glue |
 
 The `firmware/brookesia/components/` tree is a separate maintained firmware
-surface. Its BSP consumer is also pinned to `3.0.1`; its two revision profiles
-are built separately from the unchanged example matrix.
+surface. Its BSP consumer is also pinned to `3.0.1`; its `3_4c` and `4c`
+rev3.x display profiles are built separately from the unchanged example matrix.
 
 When a reusable correction is needed in the shared Waveshare component
 repository, request authorization for that upstream change before publishing a

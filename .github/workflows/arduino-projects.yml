@@ -137,8 +137,7 @@ jobs:
             --warnings all \
             --libraries "$library_root" \
             --build-path "$build_path" \
-            --build-property "compiler.c.extra_flags=-I$library_root" \
-            --build-property "compiler.cpp.extra_flags=-I$library_root -DCURRENT_SCREEN=$SCREEN_DEFINE" \
+            --build-property "compiler.cpp.extra_flags=-DCURRENT_SCREEN=$SCREEN_DEFINE" \
             "$SKETCH_PATH"
 
       - name: Package flashable example artifact

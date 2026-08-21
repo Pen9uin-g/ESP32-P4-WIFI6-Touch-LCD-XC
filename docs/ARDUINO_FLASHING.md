@@ -4,7 +4,7 @@
 
 ## Scope
 
-This guide applies to the five first-party sketches under
+This guide applies to the 10 first-party sketches under
 `examples/arduino/examples/` built with Arduino-ESP32 `3.3.11` and the exact
 FQBN recorded in [the Arduino README](../examples/arduino/README.md). Select the
 package whose 3.4C or 4C display variant matches the connected product.

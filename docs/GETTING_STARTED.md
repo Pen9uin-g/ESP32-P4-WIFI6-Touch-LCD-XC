@@ -46,8 +46,8 @@ Every first-party example in this repository has its own `CMakeLists.txt` and
 - `examples/esp-idf/<example>`
 
 The maintained `firmware/` source tree is a separate delivery surface. It is
-documented and inventoried, but is not part of the default example CI matrix;
-see [Firmware Source Boundary](FIRMWARE.md) before changing it.
+not part of the default example CI matrix; it uses only rev3.x `3_4c` and `4c`
+profiles. See [Firmware Source Boundary](FIRMWARE.md) before changing it.
 
 Use the same commands from inside the project directory, or use ESP-IDF's
 project path option:
