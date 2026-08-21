@@ -71,4 +71,3 @@ const lv_image_dsc_t esp_brookesia_image_small_recents_screen_trash_38_38 = {
   .data_size = sizeof(esp_brookesia_image_small_recents_screen_trash_38_38_map),
   .data = esp_brookesia_image_small_recents_screen_trash_38_38_map,
 };
-

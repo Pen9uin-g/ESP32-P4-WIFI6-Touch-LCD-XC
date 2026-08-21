@@ -28,10 +28,12 @@
 #include <string.h>
 #include "tusb.h"
 #include "tusb_config.h"
-#include "uac_config.h"
 #include "usb_descriptors.h"
-#include "uac_descriptors.h"
 #include "sdkconfig.h"
+#if CONFIG_UAC_AUDIO_ENABLE
+#include "uac_config.h"
+#include "uac_descriptors.h"
+#endif
 
 #if CONFIG_BSP_LCD_TYPE_800_800_3_4_INCH
 #define USB_EXTEND_SCREEN_HEIGHT  800
@@ -106,9 +108,13 @@ uint8_t const * tud_hid_descriptor_report_cb(uint8_t instance)
 // Configuration Descriptor
 //--------------------------------------------------------------------+
 
-#define CONFIG_TOTAL_LEN    (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN * CFG_TUD_HID + \
-                             TUD_VENDOR_DESC_LEN * CFG_TUD_VENDOR + \
-                             TUD_AUDIO_DEVICE_DESC_LEN * CFG_TUD_AUDIO)
+#define CONFIG_BASE_LEN     (TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN * CFG_TUD_HID + \
+                             TUD_VENDOR_DESC_LEN * CFG_TUD_VENDOR)
+#if CFG_TUD_AUDIO
+#define CONFIG_TOTAL_LEN    (CONFIG_BASE_LEN + TUD_AUDIO_DEVICE_DESC_LEN)
+#else
+#define CONFIG_TOTAL_LEN    CONFIG_BASE_LEN
+#endif
 
 uint8_t const desc_fs_configuration[] = {
     // Config number, interface count, string index, total length, attribute, power in mA

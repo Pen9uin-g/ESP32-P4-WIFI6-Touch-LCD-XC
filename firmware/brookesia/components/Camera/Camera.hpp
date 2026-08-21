@@ -6,6 +6,7 @@
 #include "driver/ppa.h"
 #include "esp_lcd_touch.h"
 #include "esp_lcd_types.h"
+#include "esp_lcd_types.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl.h"
@@ -38,7 +39,6 @@ namespace esp_brookesia::apps
         static constexpr int PREVIEW_TASK_STACK_SIZE = 8 * 1024;
         static constexpr int PREVIEW_TASK_PRIORITY = 8;
         static constexpr int SWIPE_EXIT_THRESHOLD = 180;
-        static constexpr int OV5647_AE_TARGET_LEVEL = 0x38;
 
         lv_obj_t *_status_label = nullptr;
         lv_display_t *_display = nullptr;
@@ -69,7 +69,6 @@ namespace esp_brookesia::apps
         void requestStopPreview();
         esp_err_t initVideoDriver();
         esp_err_t openVideoDevice();
-        esp_err_t tuneCameraControls();
         esp_err_t setupCameraBuffers();
         esp_err_t startDummyPreview();
         void stopDummyPreview();

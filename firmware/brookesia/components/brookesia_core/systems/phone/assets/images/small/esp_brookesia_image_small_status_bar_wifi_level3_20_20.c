@@ -53,4 +53,3 @@ const lv_image_dsc_t esp_brookesia_image_small_status_bar_wifi_level3_20_20 = {
   .data_size = sizeof(esp_brookesia_image_small_status_bar_wifi_level3_20_20_map),
   .data = esp_brookesia_image_small_status_bar_wifi_level3_20_20_map,
 };
-

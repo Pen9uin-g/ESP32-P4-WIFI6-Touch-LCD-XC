@@ -30,16 +30,21 @@ namespace esp_brookesia::apps
     private:
         static SpecAnalyzer *_instance;
 
-        // Audio pipeline parameters. The current hardware renders one microphone, while
-        // the BSP recorder still returns interleaved stereo frames.
-        static constexpr uint16_t N_SAMPLES = 1024;       // Samples per channel
-        static constexpr uint16_t I2S_CHANNELS = 2;       // BSP capture frame layout: L/R interleaved
-        static constexpr uint16_t MIC_COUNT = 1;          // Only one microphone is visualized
-        static constexpr uint16_t STRIPE_COUNT = 48;      // Bar count for the visualizer
-        static constexpr bool IS_ROUND_SCREEN = (BSP_LCD_H_RES == BSP_LCD_V_RES);
-        static constexpr uint16_t CANVAS_WIDTH = IS_ROUND_SCREEN ? (BSP_LCD_H_RES * 70 / 100) : BSP_LCD_H_RES;
-        static constexpr uint16_t CANVAS_HEIGHT = IS_ROUND_SCREEN ? (BSP_LCD_V_RES * 70 / 100) :
-                                                   ((BSP_LCD_V_RES >= 720) ? 360 : (BSP_LCD_V_RES / 2));
+        // Capture the complete ES7210 frame in its board-observed
+        // [MIC1, MIC3 (echo), MIC2, MIC4] order. The two front microphones are
+        // extracted in software so slot filtering cannot change the DMA layout.
+        static constexpr uint16_t N_SAMPLES = 1024;
+        static constexpr uint16_t TDM_SLOT_COUNT = 4;
+        static constexpr uint16_t CAPTURE_TDM_SLOT_MASK = BSP_EXTRA_ES7210_TDM_ALL_SLOTS_MASK;
+        static constexpr uint16_t CAPTURE_CHANNELS = TDM_SLOT_COUNT;
+        static constexpr uint16_t MIC_COUNT = 2;
+        static constexpr uint16_t PHYSICAL_MIC1_TDM_SLOT_INDEX = 0;
+        static constexpr uint16_t PHYSICAL_MIC2_TDM_SLOT_INDEX = 2;
+        static constexpr uint16_t MIC_GAIN_MASK =
+            BSP_EXTRA_ES7210_PHYSICAL_FRONT_MIC_MASK;
+        static constexpr uint16_t STRIPE_COUNT = 48;
+        static constexpr uint16_t CANVAS_WIDTH = BSP_LCD_H_RES;
+        static constexpr uint16_t CANVAS_HEIGHT = (BSP_LCD_V_RES >= 720) ? 360 : (BSP_LCD_V_RES / 2);
 
         lv_obj_t *_canvas;
         lv_obj_t *_mic_label;
@@ -47,8 +52,8 @@ namespace esp_brookesia::apps
         TaskHandle_t _audio_task_handle;
         bool _audio_task_running;
 
-        // Single-microphone visualization buffers.
-        __attribute__((aligned(16))) int16_t _raw_data[N_SAMPLES * I2S_CHANNELS]; // Raw BSP interleaved samples
+        // Dual-microphone visualization buffers.
+        __attribute__((aligned(16))) int16_t _raw_data[N_SAMPLES * CAPTURE_CHANNELS]; // Packed microphone samples
         __attribute__((aligned(16))) float _audio_buffer[MIC_COUNT][N_SAMPLES];   // Normalized microphone samples
         __attribute__((aligned(16))) float _wind[N_SAMPLES];                      // Shared Hann window
         __attribute__((aligned(16))) float _fft_buffer[MIC_COUNT][N_SAMPLES * 2]; // Complex FFT input

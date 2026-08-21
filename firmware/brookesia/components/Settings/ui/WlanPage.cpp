@@ -1,6 +1,6 @@
 #include "WlanPage.hpp"
 #include "../Settings.hpp"
-#include "RoundDisplay.hpp"
+#include "SettingsUI.hpp"
 
 #define ESP_UTILS_LOG_TAG "BS:WlanPage"
 #include "esp_lib_utils.h"
@@ -15,20 +15,6 @@ LV_IMG_DECLARE(wifi_4);
 
 namespace esp_brookesia::apps
 {
-    static constexpr int SETTINGS_PAGE_MARGIN = 24;
-    static constexpr int SETTINGS_LIST_VERTICAL_MARGIN = 12;
-    static constexpr int SETTINGS_ROW_HEIGHT = 76;
-
-    static int settings_list_width()
-    {
-        return round_display::safe_width(SETTINGS_PAGE_MARGIN);
-    }
-
-    static int settings_list_height()
-    {
-        return round_display::safe_height(SETTINGS_LIST_VERTICAL_MARGIN);
-    }
-
     WlanPage *WlanPage::_instance = nullptr;
 
     lv_obj_t *WlanPage::ta = nullptr;
@@ -44,18 +30,18 @@ namespace esp_brookesia::apps
     }
 
     WlanPage::WlanPage(bool use_status_bar, bool use_navigation_bar)
-        : systems::phone::App("WLAN", nullptr, true, use_status_bar, use_navigation_bar),
-          label(nullptr), list1(nullptr),
+        : App("WLAN", nullptr, true, use_status_bar, use_navigation_bar),
+          page_root(nullptr), label(nullptr), list1(nullptr),
           connected_text(nullptr), conn_btn(nullptr), available_text(nullptr)
     {
         status_btn = nullptr;
         wlan_switch = nullptr;
         wifi_icon = nullptr;
         spinner = nullptr;
+        password_title = nullptr;
         wifi_TaskHandle = nullptr;
         wifi_index = 0;
         wifi_ssid = nullptr;
-        wifi_pwd = nullptr;
     }
 
     WlanPage::~WlanPage() {}
@@ -83,7 +69,7 @@ namespace esp_brookesia::apps
         // Restore the persisted Wi-Fi switch state after the UI exists.
         if (_nvs_param_map[NVS_KEY_WIFI_ENABLE]) {
             OpenWifi();
-        } 
+        }
 
         // The background task owns blocking scan/connect calls and posts UI work
         // back to LVGL with lv_async_call.
@@ -104,8 +90,9 @@ namespace esp_brookesia::apps
     bool WlanPage::back()
     {
         ESP_UTILS_LOGI("WlanPage Back");
-        
-        return notifyCoreClosed();
+
+        Settings::requestInstance()->showRootPage();
+        return true;
     }
 
     bool WlanPage::close()
@@ -123,29 +110,11 @@ namespace esp_brookesia::apps
 
         if(wifi_events_registered)
             stop_wifi_events();
-        if (label)
+        if (page_root != nullptr)
         {
-            lv_obj_del(label);
+            lv_obj_del(page_root);
+            page_root = nullptr;
             label = nullptr;
-        }
-        if (spinner)
-        {
-            lv_obj_del(spinner);
-            spinner = nullptr;
-        }
-        if (kb)
-        {
-            lv_obj_del(kb);
-            kb = nullptr;
-        }
-        if (ta)
-        {
-            lv_obj_del(ta);
-            ta = nullptr;
-        }
-        if (list1)
-        {
-            lv_obj_del(list1);
             list1 = nullptr;
             connected_text = nullptr;
             conn_btn = nullptr;
@@ -154,11 +123,11 @@ namespace esp_brookesia::apps
             wlan_switch = nullptr;
             wifi_icon = nullptr;
             spinner = nullptr;
+            password_title = nullptr;
+            ta = nullptr;
+            kb = nullptr;
             wifi_btns.clear();
-            lv_style_reset(&style_list);
-            lv_style_reset(&style_list_btn);
-            lv_style_reset(&style_list_text);
-            lv_style_reset(&style_list_btn_pressed);
+            settings_ui::reset_list_styles(style_list, style_list_btn, style_list_text, style_list_btn_pressed);
         }
 
         return true;
@@ -169,89 +138,30 @@ namespace esp_brookesia::apps
     {
         lv_obj_clean(lv_scr_act());
 
-        lv_style_init(&style_list);
-        lv_style_init(&style_list_btn);
-        lv_style_init(&style_list_text);
-        lv_style_init(&style_list_btn_pressed);
-
-        lv_style_set_pad_all(&style_list, 5);
-        lv_style_set_pad_row(&style_list, 2);
-        lv_style_set_border_width(&style_list, 0);
-        lv_style_set_radius(&style_list, 10);
-        lv_style_set_bg_color(&style_list, lv_color_hex(0x000000));
-        lv_style_set_bg_opa(&style_list, LV_OPA_COVER);
-
-        lv_style_set_height(&style_list_btn, round_display::row_height(SETTINGS_ROW_HEIGHT));
-        lv_style_set_pad_all(&style_list_btn, 16);
-        lv_style_set_radius(&style_list_btn, 8);
-        lv_style_set_bg_color(&style_list_btn, lv_color_hex(0x38393A));
-        lv_style_set_text_font(&style_list_btn, round_display::font_30());
-        lv_style_set_text_color(&style_list_btn, lv_color_hex(0xFFFFFF));
-        lv_style_set_border_width(&style_list_btn, 1);
-        lv_style_set_border_side(&style_list_btn, LV_BORDER_SIDE_BOTTOM);
-        lv_style_set_border_color(&style_list_btn, lv_color_hex(0x505050));
-
-        lv_style_set_text_font(&style_list_text, round_display::font_30());
-        lv_style_set_text_color(&style_list_text, lv_color_hex(0xFFFFFF));
-        lv_style_set_bg_color(&style_list_text, lv_color_hex(0x000000));
-        lv_style_set_bg_opa(&style_list_text, LV_OPA_COVER);
-        lv_style_set_pad_all(&style_list_text, 10);
-        lv_style_set_pad_bottom(&style_list_text, 5);
-
-        lv_style_set_bg_color(&style_list_btn_pressed, lv_color_hex(0x505050));
-        lv_style_set_text_color(&style_list_btn_pressed, lv_color_hex(0xFFFFFF));
-        lv_style_set_border_color(&style_list_btn_pressed, lv_color_hex(0x505050));
-
-        lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(lv_scr_act(), LV_OPA_COVER, LV_PART_MAIN);
-
-        list1 = lv_list_create(lv_scr_act());
-        lv_obj_add_style(list1, &style_list, 0);
-        lv_obj_set_size(list1, settings_list_width(), settings_list_height());
-        lv_obj_center(list1);
-        lv_obj_set_scrollbar_mode(list1, LV_SCROLLBAR_MODE_OFF);
-
-        static lv_style_t style_status;
-        lv_style_init(&style_status);
-        lv_style_set_text_font(&style_status, round_display::font_30());
-        lv_style_set_text_color(&style_status, lv_color_hex(0x00BFFF));
-        lv_style_set_bg_color(&style_status, lv_color_hex(0x38393A));
-        lv_style_set_bg_opa(&style_status, LV_OPA_COVER);
-        lv_style_set_pad_all(&style_status, 10);
-
-        status_btn = lv_list_add_btn(list1, LV_SYMBOL_LEFT, "back");
-        lv_obj_add_style(status_btn, &style_status, 0);
-        lv_obj_add_event_cb(status_btn, [](lv_event_t *e)
-                            {
-        (void)e;
-        ESP_UTILS_LOGI("Goback clicked!");
-        lv_async_call([](void *param) {
-            (void)param;
-            auto wlan = WlanPage::requestInstance(true, false);
-            wlan->close();
-            auto settings = Settings::requestInstance(true, false);
-            settings->run();
-        }, nullptr); }, LV_EVENT_CLICKED, nullptr);
-         
-        lv_obj_t * wifi_ant_btn = lv_button_create(status_btn);
-        lv_obj_add_style(wifi_ant_btn, &style_status, 0);
-        lv_obj_set_user_data(wifi_ant_btn, (void*)0);
-        
-        lv_obj_add_event_cb(wifi_ant_btn, [](lv_event_t *e)
-        {
+        page_root = settings_ui::create_page(lv_scr_act());
+        status_btn = settings_ui::create_header(page_root, "WLAN", [](lv_event_t *e) {
             (void)e;
-        }, LV_EVENT_CLICKED, nullptr);
+            lv_async_call([](void *param) {
+                (void)param;
+                Settings::requestInstance()->showRootPage();
+            }, nullptr);
+        });
 
-        lv_obj_t *text_obj = lv_list_add_text(list1, "Status");
-        lv_obj_add_style(text_obj, &style_list_text, 0);
+        settings_ui::init_list_styles(style_list, style_list_btn, style_list_text, style_list_btn_pressed);
 
-        lv_obj_t *wlan_btn = lv_list_add_btn(list1, nullptr, "WLAN");
-        lv_obj_add_style(wlan_btn, &style_list_btn, 0);
+        list1 = settings_ui::create_content_list(page_root);
+        lv_obj_add_style(list1, &style_list, LV_PART_MAIN);
+
+        settings_ui::add_section(list1, "Network", style_list_text);
+
+        lv_obj_t *wlan_btn = lv_list_add_button(list1, nullptr, "Wi-Fi");
+        lv_obj_add_style(wlan_btn, &style_list_btn, LV_PART_MAIN);
+        settings_ui::use_ellipsis_for_button_label(wlan_btn);
 
         wlan_switch = lv_switch_create(wlan_btn);
-        lv_obj_align_to(wlan_switch, wlan_btn, LV_ALIGN_RIGHT_MID, 0, 0);
+        lv_obj_set_size(wlan_switch, 64, 36);
         lv_obj_remove_state(wlan_switch, LV_STATE_CHECKED);
-        
+
         lv_obj_add_event_cb(wlan_switch, [](lv_event_t *e)
         {
             lv_obj_t *sw = static_cast<lv_obj_t *>(lv_event_get_target(e));
@@ -260,73 +170,83 @@ namespace esp_brookesia::apps
 
             if (checked) page->toggleWifiUI(WIFIOPEN);
             else page->toggleWifiUI(WIFICLOSE);
-        }, 
+        },
         LV_EVENT_VALUE_CHANGED, nullptr);
 
         lv_obj_add_state(wlan_btn, LV_STATE_DISABLED);
         // lv_obj_add_state(conn_btn, LV_STATE_DISABLED);
 
-        spinner = lv_spinner_create(lv_scr_act()); // Create a spinner with 1000ms rotation duration
-        lv_obj_set_size(spinner, 96, 96);
-        lv_obj_set_pos(spinner, 0, 80);
-        lv_obj_set_align(spinner, LV_ALIGN_CENTER);              // Align spinner to the center of the parent container
-        lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);            // Initially hide the spinner
-        lv_obj_set_style_arc_width(spinner, 3, LV_PART_MAIN);
-        lv_obj_set_style_arc_width(spinner, 3, LV_PART_INDICATOR);
+        lv_obj_update_layout(page_root);
+        lv_coord_t content_width = lv_obj_get_width(page_root) - settings_ui::PAGE_HORIZONTAL_MARGIN * 2;
+        lv_coord_t keyboard_height = lv_obj_get_height(page_root) * 38 / 100;
+        if (keyboard_height > 420) {
+            keyboard_height = 420;
+        } else if (keyboard_height < 260) {
+            keyboard_height = 260;
+        }
+        if (content_width < 1) {
+            content_width = 1;
+        }
 
-        ta = lv_textarea_create(lv_scr_act());
+        spinner = lv_spinner_create(page_root);
+        lv_obj_set_size(spinner, 72, 72);
+        lv_obj_align(spinner, LV_ALIGN_CENTER, 0, 36);
+        lv_obj_add_flag(spinner, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_style_arc_width(spinner, 4, LV_PART_MAIN);
+        lv_obj_set_style_arc_width(spinner, 4, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_color(spinner, lv_color_hex(settings_ui::COLOR_ACCENT), LV_PART_INDICATOR);
+
+        password_title = lv_label_create(page_root);
+        lv_label_set_text(password_title, "Connect to network");
+        lv_label_set_long_mode(password_title, LV_LABEL_LONG_MODE_DOTS);
+        lv_obj_set_width(password_title, content_width);
+        lv_obj_set_style_text_font(password_title, &lv_font_montserrat_24, LV_PART_MAIN);
+        lv_obj_set_style_text_color(password_title, lv_color_hex(settings_ui::COLOR_PRIMARY_TEXT), LV_PART_MAIN);
+        lv_obj_align(password_title, LV_ALIGN_TOP_MID, 0, settings_ui::PAGE_HEADER_HEIGHT + 16);
+        lv_obj_add_flag(password_title, LV_OBJ_FLAG_HIDDEN);
+
+        ta = lv_textarea_create(page_root);
         lv_obj_add_flag(ta, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_size(ta, settings_list_width(), 64);
-        lv_obj_align(ta, LV_ALIGN_TOP_MID, 0, round_display::password_y(96));
+        lv_obj_set_size(ta, content_width, 64);
+        lv_obj_align(ta, LV_ALIGN_TOP_MID, 0, settings_ui::PAGE_HEADER_HEIGHT + 62);
 
         lv_textarea_set_password_mode(ta, true);
-        lv_textarea_set_password_show_time(ta,1500);
+        lv_textarea_set_max_length(ta, sizeof(wifi_pwd) - 1);
+        lv_textarea_set_password_show_time(ta, 1500);
         lv_textarea_set_placeholder_text(ta, "Enter password...");
-
-        lv_obj_set_style_border_color(ta, lv_color_hex(0x555555), LV_PART_MAIN);
+        lv_obj_set_style_bg_color(ta, lv_color_hex(settings_ui::COLOR_SURFACE), LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(ta, LV_OPA_COVER, LV_PART_MAIN);
+        lv_obj_set_style_border_color(ta, lv_color_hex(settings_ui::COLOR_BORDER), LV_PART_MAIN);
         lv_obj_set_style_border_width(ta, 2, LV_PART_MAIN);
-        lv_obj_set_style_radius(ta, 5, LV_PART_MAIN);
-        lv_obj_set_style_text_color(ta, lv_color_hex(0xFFFFFF), LV_PART_MAIN);
-
-        lv_obj_set_style_bg_color(ta, lv_color_hex(0x181818), static_cast<lv_style_prop_t>(LV_PART_CURSOR) | static_cast<lv_style_prop_t>(LV_STATE_DEFAULT));
-
-        lv_obj_set_style_text_color(ta, lv_color_hex(0xAAAAAA), LV_PART_TEXTAREA_PLACEHOLDER);
-
+        lv_obj_set_style_radius(ta, 6, LV_PART_MAIN);
+        lv_obj_set_style_text_color(ta, lv_color_hex(settings_ui::COLOR_PRIMARY_TEXT), LV_PART_MAIN);
+        lv_obj_set_style_text_color(ta, lv_color_hex(settings_ui::COLOR_SECONDARY_TEXT), LV_PART_TEXTAREA_PLACEHOLDER);
         lv_obj_set_style_text_font(ta, &lv_font_montserrat_20, LV_PART_MAIN);
         lv_obj_set_style_text_font(ta, &lv_font_montserrat_20, LV_PART_TEXTAREA_PLACEHOLDER);
-
+        lv_obj_set_style_bg_color(ta, lv_color_white(), LV_PART_CURSOR);
+        lv_obj_set_style_bg_opa(ta, LV_OPA_COVER, LV_PART_CURSOR);
         lv_obj_add_event_cb(ta, ta_event_cb, LV_EVENT_ALL, this);
 
-        kb = lv_keyboard_create(lv_scr_act());
+        kb = lv_keyboard_create(page_root);
         lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_size(kb, settings_list_width(), round_display::keyboard_height());
-        lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, -round_display::keyboard_bottom_offset());
-
-        lv_obj_set_style_bg_color(kb, lv_color_hex(0x181818), 0);
-        lv_obj_set_style_border_color(kb, lv_color_hex(0x555555), 0);
-        lv_obj_set_style_border_width(kb, 2, 0);
-        lv_obj_set_style_radius(kb, 5, 0);
-
-        // LVGL keyboard buttons are child objects; style them after creation.
-        uint32_t child_cnt = lv_obj_get_child_cnt(kb);
-        for(uint32_t i = 0; i < child_cnt; i++) {
-            lv_obj_t * row = lv_obj_get_child(kb, i);
-            uint32_t btn_cnt = lv_obj_get_child_cnt(row);
-            for(uint32_t j = 0; j < btn_cnt; j++) {
-                lv_obj_t * btn = lv_obj_get_child(row, j);
-                lv_obj_set_style_bg_color(btn, lv_color_hex(0x333333), 0);
-                lv_obj_set_style_text_color(btn, lv_color_hex(0xFFFFFF), 0);
-                lv_obj_set_style_border_color(btn, lv_color_hex(0x555555), 0);
-                lv_obj_set_style_border_width(btn, 1, 0);
-                lv_obj_set_style_radius(btn, 5, 0);
-            }
-        }
+        lv_obj_set_size(kb, content_width, keyboard_height);
+        lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, -20);
+        lv_keyboard_set_mode(kb, LV_KEYBOARD_MODE_TEXT_LOWER);
+        lv_obj_set_style_pad_all(kb, 8, LV_PART_MAIN);
+        lv_obj_set_style_pad_row(kb, 6, LV_PART_MAIN);
+        lv_obj_set_style_pad_column(kb, 6, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(kb, lv_color_hex(0x181818), LV_PART_MAIN);
+        lv_obj_set_style_border_color(kb, lv_color_hex(settings_ui::COLOR_BORDER), LV_PART_MAIN);
+        lv_obj_set_style_border_width(kb, 2, LV_PART_MAIN);
+        lv_obj_set_style_radius(kb, 6, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(kb, lv_color_hex(0x333333), LV_PART_ITEMS);
+        lv_obj_set_style_text_color(kb, lv_color_hex(settings_ui::COLOR_PRIMARY_TEXT), LV_PART_ITEMS);
+        lv_obj_set_style_text_font(kb, &lv_font_montserrat_18, LV_PART_ITEMS);
+        lv_obj_set_style_border_color(kb, lv_color_hex(0x555555), LV_PART_ITEMS);
+        lv_obj_set_style_border_width(kb, 1, LV_PART_ITEMS);
+        lv_obj_set_style_radius(kb, 4, LV_PART_ITEMS);
         lv_keyboard_set_textarea(kb, ta);
-
         lv_obj_add_event_cb(kb, kb_event_cb, LV_EVENT_ALL, this);
-
-        lv_obj_set_scroll_dir(lv_scr_act(), LV_DIR_VER);
-        lv_obj_scroll_to_view(ta, LV_ANIM_ON);
     }
 
     bool WlanPage::OpenWifi()
@@ -339,15 +259,15 @@ namespace esp_brookesia::apps
             lv_obj_add_state(wlan_switch, LV_STATE_CHECKED);
             lv_obj_add_state(wlan_switch, LV_STATE_DISABLED);
         }
-        if (status_btn) {
-            lv_obj_add_state(status_btn, LV_STATE_DISABLED);
-        }
         if (spinner) {
             lv_obj_remove_flag(spinner, LV_OBJ_FLAG_HIDDEN);
         }
-        
+        if (list1) {
+            lv_obj_add_flag(list1, LV_OBJ_FLAG_HIDDEN);
+        }
+
         Wifi_state = WIFIOPEN;
-        
+
         return true;
     }
 
@@ -356,8 +276,8 @@ namespace esp_brookesia::apps
         ESP_UTILS_LOGI("WlanPage CloseWifi");
         Wifi_state = WIFICLOSE;
 
-        esp_wifi_disconnect();   
-        
+        esp_wifi_disconnect();
+
         if (connected_text)
             lv_obj_add_flag(connected_text, LV_OBJ_FLAG_HIDDEN);
         if (conn_btn)
@@ -375,7 +295,7 @@ namespace esp_brookesia::apps
 
     void WlanPage::toggleWifiUI(WifiState visible)
     {
-        if (visible == WIFIOPEN) 
+        if (visible == WIFIOPEN)
         {
             _nvs_param_map[NVS_KEY_WIFI_ENABLE] = true;
             setNvsParam(NVS_KEY_WIFI_ENABLE, true);
@@ -402,16 +322,20 @@ namespace esp_brookesia::apps
         if (self->ta) {
             lv_obj_add_flag(self->ta, LV_OBJ_FLAG_HIDDEN);
         }
+        if (self->password_title) {
+            lv_obj_add_flag(self->password_title, LV_OBJ_FLAG_HIDDEN);
+        }
         if (self->spinner) {
             lv_obj_add_flag(self->spinner, LV_OBJ_FLAG_HIDDEN);
         }
+        lv_obj_remove_flag(self->list1, LV_OBJ_FLAG_HIDDEN);
         if (self->wlan_switch) {
             lv_obj_remove_state(self->wlan_switch, LV_STATE_DISABLED);
         }
         if (self->status_btn) {
             lv_obj_remove_state(self->status_btn, LV_STATE_DISABLED);
         }
-        
+
 
         lv_timer_t *t = lv_timer_create(self->wifi_sta_cb, 100, self);
         if (t) {
@@ -445,7 +369,12 @@ namespace esp_brookesia::apps
 
             page->wifi_ssid = page->ap_info[page->wifi_index].ssid;
             ESP_UTILS_LOGI("Selected SSID: %s", (const char *)page->wifi_ssid);
-            
+
+            if (page->password_title) {
+                lv_label_set_text_fmt(page->password_title, "Connect to %s", (const char *)page->wifi_ssid);
+                lv_obj_remove_flag(page->password_title, LV_OBJ_FLAG_HIDDEN);
+            }
+            lv_textarea_set_text(ta, "");
             lv_obj_add_flag(page->list1, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(ta, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_state(ta, LV_STATE_FOCUSED);
@@ -457,7 +386,7 @@ namespace esp_brookesia::apps
 
     // Rebuilds the connected/available AP list after a background scan completes.
     void WlanPage::wifi_scan_cb(lv_timer_t * timer) {
-        
+
         WlanPage *self = static_cast<WlanPage *>(timer->user_data);
         if (!self || !self->page_active || !self->list1) {
             return;
@@ -485,11 +414,12 @@ namespace esp_brookesia::apps
 
         // Connected WLAN
         self->connected_text = lv_list_add_text(self->list1, "Connected WLAN");
-        lv_obj_add_style(self->connected_text, &self->style_list_text, 0);
+        lv_obj_add_style(self->connected_text, &self->style_list_text, LV_PART_MAIN);
         lv_obj_add_flag(self->connected_text, LV_OBJ_FLAG_HIDDEN);
 
-        self->conn_btn = lv_list_add_btn(self->list1, nullptr,"SSID");
-        lv_obj_add_style(self->conn_btn, &self->style_list_btn, 0);
+        self->conn_btn = lv_list_add_button(self->list1, nullptr, "SSID");
+        lv_obj_add_style(self->conn_btn, &self->style_list_btn, LV_PART_MAIN);
+        settings_ui::use_ellipsis_for_button_label(self->conn_btn);
         lv_obj_add_flag(self->conn_btn, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(self->conn_btn, LV_OBJ_FLAG_CLICKABLE);
 
@@ -522,16 +452,15 @@ namespace esp_brookesia::apps
                     lv_obj_add_flag(page->conn_btn, LV_OBJ_FLAG_HIDDEN);
                 }
             }
-        }, 
+        },
         LV_EVENT_SHORT_CLICKED, nullptr);
 
         self->wifi_icon = lv_label_create(self->conn_btn);
-        lv_label_set_text(self->wifi_icon, LV_SYMBOL_CLOSE); //LV_SYMBOL_OK
-        lv_obj_align(self->wifi_icon, LV_ALIGN_RIGHT_MID, -20, 0);
-        lv_obj_set_style_text_font(self->wifi_icon, &lv_font_montserrat_30, 0);
+        lv_label_set_text(self->wifi_icon, LV_SYMBOL_CLOSE);
+        lv_obj_set_style_text_font(self->wifi_icon, &lv_font_montserrat_26, LV_PART_MAIN);
         // Available WLAN
         self->available_text = lv_list_add_text(self->list1, "Available WLAN");
-        lv_obj_add_style(self->available_text, &self->style_list_text, 0);
+        lv_obj_add_style(self->available_text, &self->style_list_text, LV_PART_MAIN);
 
         uint16_t display_count = self->scanned_ap_count;
         if (display_count > DEFAULT_SCAN_LIST_SIZE) {
@@ -543,11 +472,12 @@ namespace esp_brookesia::apps
             if (self->ap_info[i].ssid[0] == '\0') {
                 continue;
             }
-            lv_obj_t *wifi_btn = lv_list_add_btn(self->list1, nullptr, (const char *)self->ap_info[i].ssid);
-            lv_obj_add_style(wifi_btn, &self->style_list_btn, 0);
+            lv_obj_t *wifi_btn = lv_list_add_button(self->list1, nullptr, (const char *)self->ap_info[i].ssid);
+            lv_obj_add_style(wifi_btn, &self->style_list_btn, LV_PART_MAIN);
             lv_obj_add_style(wifi_btn, &self->style_list_btn_pressed, LV_STATE_PRESSED);
-            
-            lv_obj_t *icon = lv_img_create(wifi_btn);
+            settings_ui::use_ellipsis_for_button_label(wifi_btn);
+
+            lv_obj_t *icon = lv_image_create(wifi_btn);
             if (self->ap_info[i].rssi > -25)
                 lv_img_set_src(icon, &wifi_4);
             else if ((self->ap_info[i].rssi < -25) && (self->ap_info[i].rssi > -50))  // Medium signal
@@ -568,38 +498,40 @@ namespace esp_brookesia::apps
             ud->index = i;
             ud->self = self;
             lv_obj_add_event_cb(wifi_btn,wifi_btn_cb, LV_EVENT_ALL, ud);
-            lv_obj_align(icon, LV_ALIGN_RIGHT_MID, 0, 0);
 
             self->wifi_btns.push_back(wifi_btn);
         }
 
         lv_obj_remove_state(self->wlan_switch, LV_STATE_DISABLED);
         lv_obj_remove_state(self->status_btn, LV_STATE_DISABLED);
-        lv_obj_add_flag(self->spinner, LV_OBJ_FLAG_HIDDEN); 
+        lv_obj_add_flag(self->spinner, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(self->list1, LV_OBJ_FLAG_HIDDEN);
 
-        wifi_ap_record_t ap_info;
-        if (esp_wifi_sta_get_ap_info(&ap_info) == ESP_OK) {
-            ESP_LOGI("WIFI", "Connected to SSID: %s, RSSI: %d", ap_info.ssid, ap_info.rssi);
+        static wifi_config_t wifi_config;
+        esp_err_t ret = esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
+        if (ret != ESP_OK) {
+            ESP_UTILS_LOGW("esp_wifi_get_config failed: %s", esp_err_to_name(ret));
+            return;
+        }
+
+        ESP_UTILS_LOGI("SSID stored in NVS: %s", wifi_config.sta.ssid);
+        const bool has_stored_ssid = wifi_config.sta.ssid[0] != '\0';
+        if (self->Wifi_state == CONNECTED && has_stored_ssid) {
+            ESP_LOGI("WIFI", "Connected to SSID: %s", wifi_config.sta.ssid);
+            self->wifi_ssid = wifi_config.sta.ssid;
             lv_obj_remove_flag(self->connected_text, LV_OBJ_FLAG_HIDDEN);
-            lv_list_set_button_text(self->list1, self->conn_btn, (const char*)ap_info.ssid);
+            lv_list_set_button_text(self->list1, self->conn_btn, (const char*)wifi_config.sta.ssid);
             lv_obj_remove_flag(self->conn_btn, LV_OBJ_FLAG_HIDDEN);
             lv_label_set_text(self->wifi_icon, LV_SYMBOL_OK);
         } else {
             ESP_LOGI("WIFI", "Not connected");
-            static wifi_config_t wifi_config;
-            esp_err_t ret = esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
-            if (ret != ESP_OK) {
-                ESP_UTILS_LOGW("esp_wifi_get_config failed: %s", esp_err_to_name(ret));
-                return;
-            }
-            ESP_UTILS_LOGI("SSID stored in NVS: %s", wifi_config.sta.ssid);
-            if (wifi_config.sta.ssid[0] != '\0' && self->_nvs_param_map[NVS_KEY_WIFI_ENABLE]) {
+            if (has_stored_ssid && self->_nvs_param_map[NVS_KEY_WIFI_ENABLE]) {
                 printf("Wi-Fi ssid exists\n");
                 self->wifi_ssid = wifi_config.sta.ssid;
 
                 lv_obj_remove_flag(self->spinner, LV_OBJ_FLAG_HIDDEN);
                 lv_obj_add_state(self->wlan_switch, LV_STATE_DISABLED);
-                lv_obj_add_state(self->status_btn, LV_STATE_DISABLED);
+                lv_obj_add_flag(self->list1, LV_OBJ_FLAG_HIDDEN);
 
                 ret = esp_wifi_connect();
                 if (ret != ESP_OK) {
@@ -608,31 +540,37 @@ namespace esp_brookesia::apps
                 }
             } else {
                 printf("Wi-Fi ssid empty\n");
-            }   
-        } 
+            }
+        }
     }
 
     // One-shot UI refresh after a connect attempt completes or times out.
     void WlanPage::wifi_sta_cb(lv_timer_t * timer) {
-        
+
         WlanPage *self = static_cast<WlanPage *>(timer->user_data);
         if (!self || !self->page_active || !self->list1 || !self->connected_text || !self->conn_btn || !self->wifi_icon) {
             return;
         }
-        
+        if (self->wifi_ssid == nullptr || self->wifi_ssid[0] == '\0') {
+            lv_obj_add_flag(self->connected_text, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(self->conn_btn, LV_OBJ_FLAG_HIDDEN);
+            return;
+        }
+
         lv_obj_remove_flag(self->connected_text, LV_OBJ_FLAG_HIDDEN);
         lv_list_set_button_text(self->list1, self->conn_btn, (const char*)self->wifi_ssid);
-        if (self->Wifi_state == CONNECTED) 
+        if (self->Wifi_state == CONNECTED)
         {
             lv_label_set_text(self->wifi_icon, LV_SYMBOL_OK);
             lv_obj_remove_flag(self->conn_btn, LV_OBJ_FLAG_CLICKABLE);
             lv_obj_remove_flag(self->conn_btn, LV_OBJ_FLAG_HIDDEN);
-            
+
         }
-        else 
+        else
         {
             lv_label_set_text(self->wifi_icon, LV_SYMBOL_CLOSE);
             lv_obj_add_flag(self->conn_btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_remove_flag(self->conn_btn, LV_OBJ_FLAG_HIDDEN);
         }
     }
 
@@ -642,13 +580,22 @@ namespace esp_brookesia::apps
         WlanPage *self = (WlanPage *)lv_event_get_user_data(e);
         lv_event_code_t code = lv_event_get_code(e);
 
-        if(code == LV_EVENT_READY || code == LV_EVENT_CANCEL) {
-            
-            self->wifi_pwd = (uint8_t *)lv_textarea_get_text(ta);
-            
-            
-            ESP_UTILS_LOGI("Wi-Fi password length: %u", static_cast<unsigned>(strlen((char *)self->wifi_pwd)));
-            if (strlen((char *)self->wifi_pwd) >= 8)
+        if (code == LV_EVENT_CANCEL) {
+            lv_obj_add_flag(self->kb, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(self->ta, LV_OBJ_FLAG_HIDDEN);
+            if (self->password_title) {
+                lv_obj_add_flag(self->password_title, LV_OBJ_FLAG_HIDDEN);
+            }
+            lv_obj_remove_flag(self->list1, LV_OBJ_FLAG_HIDDEN);
+            lv_textarea_set_text(self->ta, "");
+            return;
+        }
+
+        if (code == LV_EVENT_READY) {
+
+            strlcpy(self->wifi_pwd, lv_textarea_get_text(ta), sizeof(self->wifi_pwd));
+            ESP_UTILS_LOGI("Wi-Fi password length: %u", static_cast<unsigned>(strlen(self->wifi_pwd)));
+            if (strlen(self->wifi_pwd) >= 8)
             {
                 self->Wifi_state = CONNECTING;
             }
@@ -659,16 +606,18 @@ namespace esp_brookesia::apps
             }
             lv_obj_add_flag(self->kb, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(self->ta, LV_OBJ_FLAG_HIDDEN);
+            if (self->password_title) {
+                lv_obj_add_flag(self->password_title, LV_OBJ_FLAG_HIDDEN);
+            }
             lv_obj_remove_flag(self->spinner, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_state(self->wlan_switch, LV_STATE_DISABLED);
-            lv_obj_add_state(self->status_btn, LV_STATE_DISABLED);
-            lv_obj_remove_flag(self->list1, LV_OBJ_FLAG_HIDDEN);
-  
+            lv_obj_add_flag(self->list1, LV_OBJ_FLAG_HIDDEN);
+
         }
     }
 
     // Textarea focus controls keyboard visibility.
-    void WlanPage::ta_event_cb(lv_event_t * e) 
+    void WlanPage::ta_event_cb(lv_event_t * e)
     {
         WlanPage *self = (WlanPage *)lv_event_get_user_data(e);
         lv_obj_t * ta = (lv_obj_t*)lv_event_get_target(e);
@@ -681,6 +630,9 @@ namespace esp_brookesia::apps
             lv_obj_remove_flag(self->list1, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(kb, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(ta, LV_OBJ_FLAG_HIDDEN);
+            if (self->password_title) {
+                lv_obj_add_flag(self->password_title, LV_OBJ_FLAG_HIDDEN);
+            }
             lv_keyboard_set_textarea(kb, NULL);
         }
     }
@@ -715,7 +667,7 @@ namespace esp_brookesia::apps
                 lv_async_call(wifi_state_cb, self);
             }
             self->connection_num++;
-            
+
 
         } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
             // ESP_UTILS_LOGI("IP_EVENT_STA_GOT_IP");
@@ -753,7 +705,7 @@ namespace esp_brookesia::apps
             return;
         }
 
-        wifi_events_registered = true;                                                                                              
+        wifi_events_registered = true;
         ESP_UTILS_LOGI("Wi-Fi event handler registered.\n");
     }
 
@@ -764,12 +716,12 @@ namespace esp_brookesia::apps
         if (ret != ESP_OK)
             ESP_UTILS_LOGI("Wi-Fi event handler unregistered Faile.\n");
 
-            
+
         ret = esp_event_handler_unregister(IP_EVENT,
                                                     IP_EVENT_STA_GOT_IP,
                                                     &wifi_event_handler);
         if (ret != ESP_OK)
-            ESP_UTILS_LOGI("IP event handler unregistered Faile.\n");                                            
+            ESP_UTILS_LOGI("IP event handler unregistered Faile.\n");
 
         wifi_events_registered = false;
         ESP_UTILS_LOGI("Wi-Fi event handler unregistered.\n");
@@ -834,20 +786,20 @@ namespace esp_brookesia::apps
                     }, self);
                 }
             }
-            
+
             if (self->Wifi_state == CONNECTING)
             {
                 ESP_UTILS_LOGI("ssid:%s", self->wifi_ssid);
-                ESP_UTILS_LOGI("password length:%u", static_cast<unsigned>(strlen((char *)self->wifi_pwd)));
+                ESP_UTILS_LOGI("password length:%u", static_cast<unsigned>(strlen(self->wifi_pwd)));
 
                 // ESP_UTILS_LOGI("authmode:%d", self->ap_info[self->wifi_index].authmode);
                 esp_wifi_disconnect();
 
                 wifi_config_t wifi_config = {};
                 strlcpy((char *)wifi_config.sta.ssid, (const char *)self->wifi_ssid, sizeof(wifi_config.sta.ssid));
-                strlcpy((char *)wifi_config.sta.password, (const char *)self->wifi_pwd, sizeof(wifi_config.sta.password));
+                strlcpy((char *)wifi_config.sta.password, self->wifi_pwd, sizeof(wifi_config.sta.password));
                 wifi_config.sta.threshold.authmode = self->ap_info[self->wifi_index].authmode;
-                
+
                 // Set WiFi configuration
                 esp_err_t ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
                 if (ret == ESP_OK) {

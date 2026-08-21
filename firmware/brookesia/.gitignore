@@ -2,7 +2,10 @@
 build/
 build-*/
 managed_components/
+
+# Local components make this generated lock contain host-specific paths.
 dependencies.lock
+
 sdkconfig
 sdkconfig.old
 
@@ -30,3 +33,5 @@ __pycache__/
 .DS_Store
 Thumbs.db
 *.Zone.Identifier
+
+# Music under spiffs/music is part of the factory storage image.

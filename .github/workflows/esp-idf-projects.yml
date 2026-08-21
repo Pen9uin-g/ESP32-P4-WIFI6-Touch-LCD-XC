@@ -2,25 +2,9 @@ name: ESP-IDF projects
 
 on:
   pull_request:
-    paths:
-      - "README.md"
-      - "docs/**"
-      - "examples/README.md"
-      - "examples/esp-idf/**"
-      - "firmware/**"
-      - ".github/workflows/esp-idf-projects.yml"
-      - ".github/scripts/**"
   push:
     branches:
       - main
-    paths:
-      - "README.md"
-      - "docs/**"
-      - "examples/README.md"
-      - "examples/esp-idf/**"
-      - "firmware/**"
-      - ".github/workflows/esp-idf-projects.yml"
-      - ".github/scripts/**"
   workflow_dispatch:
     inputs:
       project:
@@ -31,68 +15,91 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: esp-idf-projects-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   self-check:
     name: Repository self-check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Run repository self-check
         run: python .github/scripts/repo_self_check.py
 
   discover:
-    name: Discover ESP-IDF projects
+    name: Route ESP-IDF changes
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.projects.outputs.matrix }}
-      has_projects: ${{ steps.projects.outputs.has_projects }}
-      projects: ${{ steps.projects.outputs.projects }}
+      matrix: ${{ steps.route.outputs.idf_matrix }}
+      has_projects: ${{ steps.route.outputs.has_idf }}
+      projects: ${{ steps.route.outputs.idf_projects }}
+      firmware_touched: ${{ steps.route.outputs.firmware_touched }}
+      release_review: ${{ steps.route.outputs.release_review }}
     steps:
-      - name: Checkout
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      - name: Discover changed ESP-IDF projects
-        id: projects
+      - name: Classify repository changes
+        id: route
         shell: bash
+        env:
+          MANUAL_PROJECT: ${{ inputs.project }}
         run: |
           set -euo pipefail
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            python .github/scripts/discover_esp_idf_projects.py \
-              --project "${{ inputs.project }}"
+            python .github/scripts/ci_change_router.py \
+              --manual-idf "$MANUAL_PROJECT"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            python .github/scripts/discover_esp_idf_projects.py \
+            python .github/scripts/ci_change_router.py \
               --base-ref "${{ github.event.pull_request.base.sha }}" \
-              --head-ref "${{ github.sha }}"
+              --head-ref "${{ github.event.pull_request.head.sha }}"
           else
             before="${{ github.event.before }}"
             if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
-              before=""
+              python .github/scripts/ci_change_router.py --all
+            else
+              python .github/scripts/ci_change_router.py \
+                --base-ref "$before" \
+                --head-ref "${{ github.sha }}"
             fi
-            python .github/scripts/discover_esp_idf_projects.py \
-              --base-ref "$before" \
-              --head-ref "${{ github.sha }}"
           fi
 
       - name: Summary
         shell: bash
+        env:
+          SELECTED_PROJECTS: ${{ steps.route.outputs.idf_projects }}
         run: |
-          if [[ "${{ steps.projects.outputs.has_projects }}" == "true" ]]; then
+          if [[ "${{ steps.route.outputs.has_idf }}" == "true" ]]; then
             {
               echo "### ESP-IDF projects selected"
               echo
-              echo '${{ steps.projects.outputs.projects }}' | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
+              printf '%s\n' "$SELECTED_PROJECTS" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
+              echo
+              echo "Each selected project builds with ESP-IDF v5.5.5 and v6.0.2."
+              echo "Display projects build both 3.4C and 4C variants; USB also builds default and vendor-only configurations."
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No ESP-IDF project changes detected." >> "$GITHUB_STEP_SUMMARY"
+            echo "No ESP-IDF example build was selected." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "${{ steps.route.outputs.firmware_touched }}" == "true" ]]; then
+            echo "Maintained firmware changed; it remains outside the example matrix." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "${{ steps.route.outputs.release_review }}" == "true" ]]; then
+            echo "Binary or archive changes require explicit release review." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   build:
-    name: Build ${{ matrix.project }}
+    name: Build ${{ matrix.project_name }} / ${{ matrix.profile_id }} / ${{ matrix.variant }} / ${{ matrix.configuration }} (${{ matrix.idf_version }})
     needs:
       - self-check
       - discover
@@ -102,12 +109,43 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
     steps:
-      - name: Checkout
+      - name: Checkout exact source revision
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Build with ESP-IDF
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v5.5.4
+          esp_idf_version: ${{ matrix.idf_version }}
           target: esp32p4
           path: ${{ matrix.project }}
+          command: ${{ matrix.command }}
+
+      - name: Package flashable example artifact
+        id: package
+        shell: bash
+        env:
+          ARTIFACT_KEY: ${{ matrix.artifact_key }}
+        run: |
+          set -euo pipefail
+          git_sha="$(git rev-parse HEAD)"
+          output="$RUNNER_TEMP/example-artifacts/$ARTIFACT_KEY"
+          python .github/scripts/package_build_artifact.py esp-idf \
+            --build-dir "${{ matrix.project }}/build" --output-dir "$output" \
+            --product-label "ESP32-P4-WIFI6-Touch-LCD-XC" --variant "${{ matrix.variant }}" \
+            --variant-id "${{ matrix.variant_id }}" \
+            --resolution "${{ matrix.resolution }}" --configuration "${{ matrix.configuration }}" \
+            --framework-version "${{ matrix.idf_version }}" --target esp32p4 \
+            --project "${{ matrix.project }}" --profile-id "${{ matrix.profile_id }}" \
+            --sdkconfig "${{ matrix.project }}/sdkconfig" --git-sha "$git_sha"
+          echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
+          echo "path=$output" >> "$GITHUB_OUTPUT"
+
+      - name: Upload flashable example artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: ${{ steps.package.outputs.path }}
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 14 || 30 }}

@@ -11,9 +11,10 @@
 #include "esp_lib_utils.h"
 #include "esp_check.h"
 #include "esp_heap_caps.h"
-#include "esp_lcd_mipi_dsi.h"
 #include "esp_log.h"
 #include "esp_lv_adapter.h"
+#include <errno.h>
+#include <sys/stat.h>
 #ifdef ESP_UTILS_LOG_TAG
 #undef ESP_UTILS_LOG_TAG
 #endif
@@ -51,14 +52,11 @@ namespace esp_brookesia::apps
         return _instance;
     }
 
-    VideoPlayer::VideoPlayer(bool use_status_bar, bool use_navigation_bar) : systems::phone::App(
-                                                                                 "VideoPlayer", &img_app_vedioplayer, true,
-                                                                                 use_status_bar, use_navigation_bar
-                                                                             ), sd_mounted(false)
+    VideoPlayer::VideoPlayer(bool use_status_bar, bool use_navigation_bar) : App("VideoPlayer", &img_app_vedioplayer, true, use_status_bar, use_navigation_bar), sd_mounted(false)
     {
-        current_buf_idx = 0;
         display = nullptr;
         display_panel = nullptr;
+        current_buf_idx = 0;
         ppa_srm_handle = nullptr;
         touch_handle = nullptr;
         jpeg_handle = nullptr;
@@ -88,46 +86,48 @@ namespace esp_brookesia::apps
     {
         ESP_UTILS_LOGD("Run");
         is_paused = false;
-        bsp_display_lock(-1);
+        if (!sd_mounted) {
+            esp_err_t mount_ret = bsp_sdcard_mount();
+            sd_mounted = mount_ret == ESP_OK || mount_ret == ESP_ERR_INVALID_STATE;
+            if (!sd_mounted) {
+                ESP_LOGE(
+                    ESP_UTILS_LOG_TAG,
+                    "Mount %s failed: %s",
+                    BSP_SD_MOUNT_POINT,
+                    esp_err_to_name(mount_ret)
+                );
+            }
+        }
+        bsp_extra_display_lock(-1);
         lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(lv_scr_act(), LV_OPA_COVER, LV_PART_MAIN);
         status_label = lv_label_create(lv_scr_act());
         lv_label_set_text(status_label, sd_mounted ? "loading files..." : "sd error");
         lv_obj_set_style_text_align(status_label, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_set_width(status_label, LV_HOR_RES);
+        lv_obj_set_width(status_label, DISPLAY_WIDTH);
         lv_obj_align(status_label, LV_ALIGN_CENTER, 0, 0);
         lv_obj_set_style_text_font(status_label, &lv_font_montserrat_20, 0);
-        bsp_display_unlock();
+        bsp_extra_display_unlock();
 
         if (!sd_mounted)
         {
             return true;
         }
 
-        if (getAviFileList("/sdcard/avi") != ESP_OK || avi_file_count == 0)
+        if (getAviFileList(BSP_SD_MOUNT_POINT "/avi") != ESP_OK || avi_file_count == 0)
         {
-            bsp_display_lock(-1);
+            bsp_extra_display_lock(-1);
             lv_label_set_text(status_label, "avi error");
-            bsp_display_unlock();
+            bsp_extra_display_unlock();
             return true;
         }
 
-        bsp_display_lock(-1);
+        bsp_extra_display_lock(-1);
         lv_obj_del(status_label);
         status_label = nullptr;
-        bsp_display_unlock();
+        bsp_extra_display_unlock();
 
-        loop_playback = true;
-
-        // AVI decoding, JPEG conversion, and PPA blitting share this task, so keep
-        // its stack larger than a normal UI task.
-        BaseType_t ret = xTaskCreatePinnedToCore(playTask, "avi_play_task", 32768, this, 7, &play_task_handle, 0);
-        if (ret != pdPASS)
-        {
-            ESP_LOGE(ESP_UTILS_LOG_TAG, "Create playback task failed");
-            return false;
-        }
-        return true;
+        return startPlaybackTask();
     }
 
     bool VideoPlayer::back(void)
@@ -141,38 +141,22 @@ namespace esp_brookesia::apps
     bool VideoPlayer::close()
     {
         ESP_UTILS_LOGD("Close");
-        loop_playback = false;
-        is_paused = false;
-
-        if (avi_player_handle) {
-            avi_player_play_stop(avi_player_handle);
-        }
-
-        if (play_task_handle)
-        {
-            close_wait_task = xTaskGetCurrentTaskHandle();
-            ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-            play_task_handle = nullptr;
-        }
-
-        if (avi_player_handle)
-        {
-            avi_player_play_stop(avi_player_handle);
-            avi_player_deinit(avi_player_handle);
-            avi_player_handle = nullptr;
+        if (!stopPlaybackTask(pdMS_TO_TICKS(2000))) {
+            ESP_LOGE(ESP_UTILS_LOG_TAG, "Playback task did not stop before close");
+            return false;
         }
 
         deinitJpegDecoder();
         releaseJpegOutputBuffer();
         deinitDisplayBypass();
 
-        bsp_display_lock(-1);
+        bsp_extra_display_lock(-1);
         if (status_label)
         {
             lv_obj_del(status_label);
             status_label = nullptr;
         }
-        bsp_display_unlock();
+        bsp_extra_display_unlock();
 
         if (avi_file_list)
         {
@@ -191,16 +175,8 @@ namespace esp_brookesia::apps
     bool VideoPlayer::init()
     {
         ESP_UTILS_LOGD("Init");
-        if (bsp_sdcard_mount() == ESP_OK)
-        {
-            sd_mounted = true;
-            ESP_UTILS_LOGD("SD card mounted successfully");
-        }
-        else
-        {
-            sd_mounted = false;
-            ESP_LOGE(ESP_UTILS_LOG_TAG, "Failed to mount SD card");
-        }
+        // Mount lazily in run() so inserting a card after boot is supported and
+        // application installation does not initialize SDMMC unnecessarily.
         return true;
     }
 
@@ -213,82 +189,170 @@ namespace esp_brookesia::apps
     bool VideoPlayer::pause()
     {
         ESP_UTILS_LOGD("Pause");
-        is_paused = true;
-        return true;
+        return stopPlaybackTask(pdMS_TO_TICKS(2000));
     }
 
     bool VideoPlayer::resume()
     {
         ESP_UTILS_LOGD("Resume");
+        if (!sd_mounted || !avi_file_list || avi_file_count == 0) {
+            return true;
+        }
+        return startPlaybackTask();
+    }
+
+    bool VideoPlayer::startPlaybackTask()
+    {
+        if (play_task_handle) {
+            return true;
+        }
+        if (!avi_file_list || avi_file_count == 0) {
+            return false;
+        }
+
+        loop_playback = true;
         is_paused = false;
+
+        // AVI parsing, JPEG decoding, PPA blitting, and PCM output share this task.
+        BaseType_t ret = xTaskCreatePinnedToCore(
+            playTask,
+            "avi_play_task",
+            32768,
+            this,
+            7,
+            &play_task_handle,
+            0
+        );
+        if (ret != pdPASS) {
+            loop_playback = false;
+            play_task_handle = nullptr;
+            ESP_LOGE(ESP_UTILS_LOG_TAG, "Create playback task failed");
+            return false;
+        }
+
+        return true;
+    }
+
+    bool VideoPlayer::stopPlaybackTask(TickType_t timeout)
+    {
+        loop_playback = false;
+        is_paused = false;
+
+        if (!play_task_handle) {
+            return true;
+        }
+        if (xTaskGetCurrentTaskHandle() == play_task_handle) {
+            return false;
+        }
+
+        close_wait_task = xTaskGetCurrentTaskHandle();
+        if (!play_task_handle) {
+            close_wait_task = nullptr;
+            return true;
+        }
+
+        if (avi_player_handle) {
+            avi_player_play_stop(avi_player_handle);
+        }
+
+        bool stopped = ulTaskNotifyTake(pdTRUE, timeout) != 0;
+        close_wait_task = nullptr;
+
+        if (!stopped || play_task_handle) {
+            ESP_LOGE(ESP_UTILS_LOG_TAG, "Timed out waiting for playback task");
+            return false;
+        }
+
         return true;
     }
 
     esp_err_t VideoPlayer::getAviFileList(const char *dir_path)
     {
         DIR *dir = opendir(dir_path);
-        if (!dir)
-            return ESP_FAIL;
+        if (!dir) {
+            ESP_LOGW(
+                ESP_UTILS_LOG_TAG,
+                "Open AVI directory failed: %s (errno=%d)",
+                dir_path,
+                errno
+            );
+            return ESP_ERR_NOT_FOUND;
+        }
 
-        struct dirent *entry;
+        auto is_regular_avi = [dir_path](const struct dirent *entry) {
+            if (!entry) {
+                return false;
+            }
+            const char *ext = strrchr(entry->d_name, '.');
+            if (!ext || strcasecmp(ext, ".avi") != 0) {
+                return false;
+            }
+            if (entry->d_type == DT_REG) {
+                return true;
+            }
+            if (entry->d_type != DT_UNKNOWN) {
+                return false;
+            }
+
+            char path[384] = {};
+            int written = snprintf(path, sizeof(path), "%s/%s", dir_path, entry->d_name);
+            if (written <= 0 || static_cast<size_t>(written) >= sizeof(path)) {
+                return false;
+            }
+            struct stat info = {};
+            return stat(path, &info) == 0 && S_ISREG(info.st_mode);
+        };
+
         int count = 0;
-
-        while ((entry = readdir(dir)) != nullptr)
-        {
-            if (entry->d_type == DT_REG)
-            {
-                char *ext = strrchr(entry->d_name, '.');
-                if (ext && strcasecmp(ext, ".avi") == 0)
-                {
-                    count++;
-                }
+        struct dirent *entry = nullptr;
+        while ((entry = readdir(dir)) != nullptr) {
+            if (is_regular_avi(entry)) {
+                ++count;
             }
         }
-
-        if (count == 0)
-        {
+        if (count == 0) {
             closedir(dir);
-            return ESP_FAIL;
+            ESP_LOGW(ESP_UTILS_LOG_TAG, "No AVI files found in %s", dir_path);
+            return ESP_ERR_NOT_FOUND;
         }
 
-        avi_file_list = (char **)malloc(sizeof(char *) * count);
-        if (!avi_file_list)
-        {
+        avi_file_list = static_cast<char **>(calloc(count, sizeof(char *)));
+        if (!avi_file_list) {
             closedir(dir);
             return ESP_ERR_NO_MEM;
         }
 
-        avi_file_count = count;
         int loaded_count = 0;
         rewinddir(dir);
-
-        while ((entry = readdir(dir)) != nullptr)
-        {
-            if (entry->d_type == DT_REG)
-            {
-                char *ext = strrchr(entry->d_name, '.');
-                if (ext && strcasecmp(ext, ".avi") == 0)
-                {
-                    size_t len = strlen(dir_path) + strlen(entry->d_name) + 2;
-                    char *full_path = (char *)malloc(len);
-                    if (!full_path) {
-                        for (int i = 0; i < loaded_count; i++) {
-                            free(avi_file_list[i]);
-                        }
-                        free(avi_file_list);
-                        avi_file_list = nullptr;
-                        avi_file_count = 0;
-                        closedir(dir);
-                        return ESP_ERR_NO_MEM;
-                    }
-                    snprintf(full_path, len, "%s/%s", dir_path, entry->d_name);
-                    avi_file_list[loaded_count++] = full_path;
-                }
+        while ((entry = readdir(dir)) != nullptr && loaded_count < count) {
+            if (!is_regular_avi(entry)) {
+                continue;
             }
+            size_t len = strlen(dir_path) + strlen(entry->d_name) + 2;
+            char *full_path = static_cast<char *>(malloc(len));
+            if (!full_path) {
+                for (int i = 0; i < loaded_count; ++i) {
+                    free(avi_file_list[i]);
+                }
+                free(avi_file_list);
+                avi_file_list = nullptr;
+                avi_file_count = 0;
+                closedir(dir);
+                return ESP_ERR_NO_MEM;
+            }
+            snprintf(full_path, len, "%s/%s", dir_path, entry->d_name);
+            avi_file_list[loaded_count++] = full_path;
         }
 
         closedir(dir);
-        return ESP_OK;
+        avi_file_count = loaded_count;
+        ESP_LOGI(
+            ESP_UTILS_LOG_TAG,
+            "Loaded %d AVI file(s) from %s",
+            avi_file_count,
+            dir_path
+        );
+        return avi_file_count > 0 ? ESP_OK : ESP_ERR_NOT_FOUND;
     }
 
     esp_err_t VideoPlayer::initDisplayBypass()
@@ -305,21 +369,37 @@ namespace esp_brookesia::apps
         display_panel = bsp_display_get_panel_handle();
         ESP_RETURN_ON_FALSE(display_panel != nullptr, ESP_ERR_INVALID_STATE, ESP_UTILS_LOG_TAG, "LCD panel is not ready");
 
-        // Reuse the BSP DPI frame buffers directly. LVGL is paused while playback is
-        // active, and esp_lv_adapter_dummy_draw_blit swaps these buffers to the panel.
+        esp_err_t ret = ESP_OK;
 #if CONFIG_BSP_LCD_DPI_BUFFER_NUMS >= 3
-        ESP_RETURN_ON_ERROR(esp_lcd_dpi_panel_get_frame_buffer(display_panel, CONFIG_BSP_LCD_DPI_BUFFER_NUMS, &lcd_buffers[0], &lcd_buffers[1], &lcd_buffers[2]), ESP_UTILS_LOG_TAG, "Get LCD frame buffers failed");
+        ret = esp_lcd_dpi_panel_get_frame_buffer(
+                  display_panel,
+                  CONFIG_BSP_LCD_DPI_BUFFER_NUMS,
+                  &lcd_buffers[0],
+                  &lcd_buffers[1],
+                  &lcd_buffers[2]
+              );
 #elif CONFIG_BSP_LCD_DPI_BUFFER_NUMS == 2
-        ESP_RETURN_ON_ERROR(esp_lcd_dpi_panel_get_frame_buffer(display_panel, CONFIG_BSP_LCD_DPI_BUFFER_NUMS, &lcd_buffers[0], &lcd_buffers[1]), ESP_UTILS_LOG_TAG, "Get LCD frame buffers failed");
+        ret = esp_lcd_dpi_panel_get_frame_buffer(
+                  display_panel,
+                  CONFIG_BSP_LCD_DPI_BUFFER_NUMS,
+                  &lcd_buffers[0],
+                  &lcd_buffers[1]
+              );
 #else
 #error "VideoPlayer needs at least two LCD frame buffers"
 #endif
+        ESP_RETURN_ON_ERROR(ret, ESP_UTILS_LOG_TAG, "Get LCD frame buffers failed");
+        current_buf_idx = 0;
 
         if (ppa_srm_handle == nullptr) {
             ppa_client_config_t ppa_srm_config = {
                 .oper_type = PPA_OPERATION_SRM,
             };
-            ESP_RETURN_ON_ERROR(ppa_register_client(&ppa_srm_config, &ppa_srm_handle), ESP_UTILS_LOG_TAG, "Register PPA SRM failed");
+            ESP_RETURN_ON_ERROR(
+                ppa_register_client(&ppa_srm_config, &ppa_srm_handle),
+                ESP_UTILS_LOG_TAG,
+                "Register PPA SRM failed"
+            );
         }
 
         bsp_display_cfg_t touch_cfg = {
@@ -332,27 +412,46 @@ namespace esp_brookesia::apps
                 .mirror_y = 0,
             },
         };
-        ESP_RETURN_ON_ERROR(bsp_touch_new(&touch_cfg, &touch_handle), ESP_UTILS_LOG_TAG, "Create touch handle failed");
+        ret = bsp_touch_new(&touch_cfg, &touch_handle);
+        if (ret != ESP_OK) {
+            deinitDisplayBypass();
+            return ret;
+        }
 
-        ESP_RETURN_ON_ERROR(esp_lv_adapter_set_dummy_draw(display, true), ESP_UTILS_LOG_TAG, "Enable dummy draw failed");
+        ret = esp_lv_adapter_set_dummy_draw(display, true);
+        if (ret != ESP_OK) {
+            deinitDisplayBypass();
+            return ret;
+        }
         dummy_enabled = true;
 
-        ESP_RETURN_ON_ERROR(esp_lv_adapter_pause(-1), ESP_UTILS_LOG_TAG, "Pause LVGL failed");
+        ret = esp_lv_adapter_pause(-1);
+        if (ret != ESP_OK) {
+            deinitDisplayBypass();
+            return ret;
+        }
         lvgl_paused = true;
 
+        ESP_LOGI(
+            ESP_UTILS_LOG_TAG,
+            "Video display bypass: %dx%d, %d frame buffers",
+            DISPLAY_WIDTH,
+            DISPLAY_HEIGHT,
+            CONFIG_BSP_LCD_DPI_BUFFER_NUMS
+        );
         return ESP_OK;
     }
 
     void VideoPlayer::deinitDisplayBypass()
     {
-        if (lvgl_paused) {
-            esp_lv_adapter_resume();
-            lvgl_paused = false;
-        }
-
         if (dummy_enabled && display) {
             esp_lv_adapter_set_dummy_draw(display, false);
             dummy_enabled = false;
+        }
+
+        if (lvgl_paused) {
+            esp_lv_adapter_resume();
+            lvgl_paused = false;
         }
 
         if (touch_handle) {
@@ -360,6 +459,10 @@ namespace esp_brookesia::apps
             touch_handle = nullptr;
         }
 
+        memset(lcd_buffers, 0, sizeof(lcd_buffers));
+        display_panel = nullptr;
+        display = nullptr;
+        current_buf_idx = 0;
         touch_active = false;
         last_video_width = 0;
         last_video_height = 0;
@@ -424,10 +527,14 @@ namespace esp_brookesia::apps
             return;
 
         VideoPlayer *self = static_cast<VideoPlayer *>(arg);
-        int next_buf_idx = (self->current_buf_idx + 1) % CONFIG_BSP_LCD_DPI_BUFFER_NUMS;
+        const int next_buf_idx =
+            (self->current_buf_idx + 1) % CONFIG_BSP_LCD_DPI_BUFFER_NUMS;
 
-        if (self->initJpegDecoder() != ESP_OK || !self->lcd_buffers[next_buf_idx] || !self->dummy_enabled || !self->ppa_srm_handle)
+        if (self->initJpegDecoder() != ESP_OK ||
+                !self->lcd_buffers[next_buf_idx] ||
+                !self->dummy_enabled || !self->ppa_srm_handle) {
             return;
+        }
 
         // Decode each MJPEG frame into a PSRAM buffer, then use PPA SRM to scale it
         // into the next LCD frame buffer without involving LVGL widgets.
@@ -461,27 +568,49 @@ namespace esp_brookesia::apps
             return;
         }
 
-        float scale_x = static_cast<float>(DISPLAY_WIDTH) / static_cast<float>(info.width);
-        float scale_y = static_cast<float>(DISPLAY_HEIGHT) / static_cast<float>(info.height);
+        uint32_t crop_x = 0;
+        uint32_t crop_y = 0;
+        uint32_t crop_w = info.width;
+        uint32_t crop_h = info.height;
+
+        if (static_cast<uint64_t>(info.width) * DISPLAY_HEIGHT >
+                static_cast<uint64_t>(info.height) * DISPLAY_WIDTH) {
+            crop_w = static_cast<uint32_t>(
+                (static_cast<uint64_t>(info.height) * DISPLAY_WIDTH) / DISPLAY_HEIGHT
+            );
+            crop_x = (info.width - crop_w) / 2;
+        } else {
+            crop_h = static_cast<uint32_t>(
+                (static_cast<uint64_t>(info.width) * DISPLAY_HEIGHT) / DISPLAY_WIDTH
+            );
+            crop_y = (info.height - crop_h) / 2;
+        }
+
+        crop_w = crop_w ? crop_w : 1;
+        crop_h = crop_h ? crop_h : 1;
+        float scale_x = static_cast<float>(DISPLAY_WIDTH) / static_cast<float>(crop_w);
+        float scale_y = static_cast<float>(DISPLAY_HEIGHT) / static_cast<float>(crop_h);
 
         if (self->last_video_width != info.width || self->last_video_height != info.height) {
-            ESP_LOGI(ESP_UTILS_LOG_TAG, "Scale video frame: %dx%d -> %dx%d",
-                     info.width, info.height, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+            ESP_LOGI(ESP_UTILS_LOG_TAG, "Cover video frame: %dx%d, crop %u,%u %ux%u",
+                     info.width, info.height, crop_x, crop_y, crop_w, crop_h);
             self->last_video_width = info.width;
             self->last_video_height = info.height;
         }
+
+        void *lcd_buffer = self->lcd_buffers[next_buf_idx];
 
         ppa_srm_oper_config_t srm_config = {};
         srm_config.in.buffer = self->jpeg_output_buffer;
         srm_config.in.pic_w = info.width;
         srm_config.in.pic_h = info.height;
-        srm_config.in.block_w = info.width;
-        srm_config.in.block_h = info.height;
-        srm_config.in.block_offset_x = 0;
-        srm_config.in.block_offset_y = 0;
+        srm_config.in.block_w = crop_w;
+        srm_config.in.block_h = crop_h;
+        srm_config.in.block_offset_x = crop_x;
+        srm_config.in.block_offset_y = crop_y;
         srm_config.in.srm_cm = VIDEO_PPA_COLOR_MODE;
 
-        srm_config.out.buffer = self->lcd_buffers[next_buf_idx];
+        srm_config.out.buffer = lcd_buffer;
         srm_config.out.buffer_size = ALIGN_UP(DISPLAY_WIDTH * DISPLAY_HEIGHT * VIDEO_BYTES_PER_PIXEL, self->data_cache_line_size);
         srm_config.out.pic_w = DISPLAY_WIDTH;
         srm_config.out.pic_h = DISPLAY_HEIGHT;
@@ -505,13 +634,14 @@ namespace esp_brookesia::apps
         }
 
         ret = esp_lv_adapter_dummy_draw_blit(
-            self->display,
-            0,
-            0,
-            DISPLAY_WIDTH,
-            DISPLAY_HEIGHT,
-            self->lcd_buffers[next_buf_idx],
-            true);
+                  self->display,
+                  0,
+                  0,
+                  DISPLAY_WIDTH,
+                  DISPLAY_HEIGHT,
+                  lcd_buffer,
+                  false
+              );
         if (ret != ESP_OK) {
             ESP_LOGE(ESP_UTILS_LOG_TAG, "Dummy draw blit failed: %s", esp_err_to_name(ret));
             return;
@@ -521,20 +651,44 @@ namespace esp_brookesia::apps
 
     void VideoPlayer::audioCallback(frame_data_t *data, void *arg)
     {
-        if (!data || data->type != FRAME_TYPE_AUDIO)
+        VideoPlayer *self = static_cast<VideoPlayer *>(arg);
+        if (!self || !self->audio_ready || !self->loop_playback ||
+                !data || data->type != FRAME_TYPE_AUDIO || !data->data || data->data_bytes == 0) {
             return;
+        }
+
         size_t bytes_written = 0;
-        bsp_extra_i2s_write(data->data, data->data_bytes, &bytes_written, portMAX_DELAY);
+        esp_err_t ret = bsp_extra_i2s_write(
+            data->data,
+            data->data_bytes,
+            &bytes_written,
+            1000
+        );
+        if (ret != ESP_OK || bytes_written != data->data_bytes) {
+            ESP_LOGW(
+                ESP_UTILS_LOG_TAG,
+                "Audio write failed: %s, %u/%u bytes",
+                esp_err_to_name(ret),
+                static_cast<unsigned>(bytes_written),
+                static_cast<unsigned>(data->data_bytes)
+            );
+        }
     }
 
     void VideoPlayer::audioSetClockCallback(uint32_t rate, uint32_t bits, uint32_t ch, void *arg)
     {
-        if (rate == 0)
-            rate = CODEC_DEFAULT_SAMPLE_RATE;
-        if (bits == 0)
-            bits = CODEC_DEFAULT_BIT_WIDTH;
-        i2s_slot_mode_t mode = (ch == 2) ? I2S_SLOT_MODE_STEREO : I2S_SLOT_MODE_MONO;
-        bsp_extra_codec_set_fs(rate, bits, mode);
+        VideoPlayer *self = static_cast<VideoPlayer *>(arg);
+        if (!self || !self->audio_ready || !self->loop_playback) {
+            return;
+        }
+
+        const uint32_t sample_rate = rate ? rate : CODEC_DEFAULT_SAMPLE_RATE;
+        const uint32_t bit_width = bits ? bits : CODEC_DEFAULT_BIT_WIDTH;
+        const i2s_slot_mode_t mode = (ch <= 1) ? I2S_SLOT_MODE_MONO : I2S_SLOT_MODE_STEREO;
+        esp_err_t ret = bsp_extra_codec_set_fs(sample_rate, bit_width, mode);
+        if (ret != ESP_OK) {
+            ESP_LOGW(ESP_UTILS_LOG_TAG, "Audio clock setup failed: %s", esp_err_to_name(ret));
+        }
     }
 
     void VideoPlayer::playEndCallback(void *arg)
@@ -576,14 +730,24 @@ namespace esp_brookesia::apps
     {
         VideoPlayer *self = static_cast<VideoPlayer *>(arg);
         bool request_close = false;
+        self->audio_ready = (bsp_extra_codec_init() == ESP_OK);
+        if (self->audio_ready) {
+            esp_err_t volume_ret = bsp_extra_codec_volume_set(CODEC_DEFAULT_VOLUME, nullptr);
+            if (volume_ret != ESP_OK) {
+                ESP_LOGW(ESP_UTILS_LOG_TAG, "Set video volume failed: %s", esp_err_to_name(volume_ret));
+            }
+        } else {
+            ESP_LOGW(ESP_UTILS_LOG_TAG, "Audio codec unavailable; continue video-only playback");
+        }
+
 
         // The AVI reader keeps a larger buffer because high-resolution MJPEG frames
         // can otherwise underflow while the PPA path is preparing the next frame.
         avi_player_config_t cfg = {
             .buffer_size = 2 * 1024 * 1024,
             .video_cb = videoCallback,
-            .audio_cb = nullptr,
-            .audio_set_clock_cb = nullptr,
+            .audio_cb = self->audio_ready ? audioCallback : nullptr,
+            .audio_set_clock_cb = self->audio_ready ? audioSetClockCallback : nullptr,
             .avi_play_end_cb = playEndCallback,
             .priority = 7,
             .coreID = 0,
@@ -597,6 +761,9 @@ namespace esp_brookesia::apps
         if (avi_player_init(cfg, &self->avi_player_handle) != ESP_OK)
         {
             ESP_LOGE(ESP_UTILS_LOG_TAG, "avi_player_init failed");
+            (void)bsp_extra_codec_output_stop();
+            self->audio_ready = false;
+            self->play_task_handle = nullptr;
             if (self->close_wait_task) {
                 xTaskNotifyGive(self->close_wait_task);
             }
@@ -609,6 +776,10 @@ namespace esp_brookesia::apps
             ESP_LOGE(ESP_UTILS_LOG_TAG, "initDisplayBypass failed");
             avi_player_deinit(self->avi_player_handle);
             self->avi_player_handle = nullptr;
+            self->deinitDisplayBypass();
+            (void)bsp_extra_codec_output_stop();
+            self->audio_ready = false;
+            self->play_task_handle = nullptr;
             if (self->close_wait_task) {
                 xTaskNotifyGive(self->close_wait_task);
             }
@@ -668,6 +839,8 @@ namespace esp_brookesia::apps
         avi_player_play_stop(self->avi_player_handle);
         avi_player_deinit(self->avi_player_handle);
         self->avi_player_handle = nullptr;
+        (void)bsp_extra_codec_output_stop();
+        self->audio_ready = false;
         self->deinitDisplayBypass();
 
         self->play_task_handle = nullptr;
@@ -680,7 +853,7 @@ namespace esp_brookesia::apps
         {
             self->notifyCoreClosed();
         }
-        
+
         vTaskDelete(NULL);
     }
 

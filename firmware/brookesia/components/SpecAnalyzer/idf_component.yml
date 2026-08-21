@@ -1,6 +1,4 @@
 version: 0.6.0
 dependencies:
-  brookesia_core:
-    public: true
   espressif/esp-dsp:
-    version: "*"
+    version: "1.8.0"

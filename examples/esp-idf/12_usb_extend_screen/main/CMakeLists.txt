@@ -1,4 +1,4 @@
-set(srcs "app_hid.c" "app_uac.c" "app_usb.c" "app_vendor.c"
+set(srcs "app_hid.c" "app_usb.c" "app_vendor.c"
          "usb_extend_screen.c" "usb_frame.c" "app_lcd_p4.c")
 
 if(CONFIG_HID_TOUCH_ENABLE)
@@ -6,7 +6,7 @@ if(CONFIG_HID_TOUCH_ENABLE)
 endif()
 
 if(CONFIG_UAC_AUDIO_ENABLE)
-    list (APPEND srcs "app_uac.c")
+    list(APPEND srcs "app_uac.c")
 endif()
 
 idf_component_register(SRCS ${srcs}
@@ -26,3 +26,11 @@ target_sources(${tusb_lib} PUBLIC "${PROJECT_DIR}/main/tusb/usb_descriptors.c")
 
 cmake_policy(SET CMP0079 NEW)
 target_link_libraries(${tusb_lib} PRIVATE ${COMPONENT_LIB})
+
+idf_build_get_property(build_components BUILD_COMPONENTS)
+if("lvgl__lvgl" IN_LIST build_components)
+    idf_component_get_property(LVGL_LIB lvgl__lvgl COMPONENT_LIB)
+    if(TARGET ${LVGL_LIB})
+        target_compile_options(${LVGL_LIB} PRIVATE -Wno-error=attributes -Wno-error=cpp)
+    endif()
+endif()

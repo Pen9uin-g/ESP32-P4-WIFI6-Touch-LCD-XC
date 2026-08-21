@@ -1,0 +1,192 @@
+name: Arduino projects
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      sketch:
+        description: "Arduino sketch directory name, path, or all"
+        required: false
+        default: "all"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arduino-projects-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  ARDUINO_CORE_VERSION: "3.3.11"
+  ESP32_INDEX_URL: "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
+  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=postv3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600"
+  BSP_REFERENCE_VERSION: "3.0.1"
+  BSP_REFERENCE_SOURCE_SHA: "bfeb6e6d5737178cdde78b630c8118074da0a657"
+  BSP_REFERENCE_SOURCE_TREE: "7c12c7115599b4bb84072ad9ea68cc8c3e81b9c6"
+  BSP_REFERENCE_COMPONENT_TREE: "eff6286f5bb97145fb43a33102b9dafdfa5f5c0b"
+  BSP_REFERENCE_RELATIONSHIP: "reference-only"
+
+jobs:
+  discover:
+    name: Route Arduino changes
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.route.outputs.arduino_matrix }}
+      has_sketches: ${{ steps.route.outputs.has_arduino }}
+      sketches: ${{ steps.route.outputs.arduino_sketches }}
+      firmware_touched: ${{ steps.route.outputs.firmware_touched }}
+      release_review: ${{ steps.route.outputs.release_review }}
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Classify repository changes
+        id: route
+        shell: bash
+        env:
+          MANUAL_SKETCH: ${{ inputs.sketch }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            python .github/scripts/ci_change_router.py \
+              --manual-arduino "$MANUAL_SKETCH"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            python .github/scripts/ci_change_router.py \
+              --base-ref "${{ github.event.pull_request.base.sha }}" \
+              --head-ref "${{ github.event.pull_request.head.sha }}"
+          else
+            before="${{ github.event.before }}"
+            if [[ "$before" == "0000000000000000000000000000000000000000" ]]; then
+              python .github/scripts/ci_change_router.py --all
+            else
+              python .github/scripts/ci_change_router.py \
+                --base-ref "$before" \
+                --head-ref "${{ github.sha }}"
+            fi
+          fi
+
+      - name: Summary
+        shell: bash
+        env:
+          SELECTED_SKETCHES: ${{ steps.route.outputs.arduino_sketches }}
+        run: |
+          if [[ "${{ steps.route.outputs.has_arduino }}" == "true" ]]; then
+            {
+              echo "### Arduino sketches selected"
+              echo
+              printf '%s\n' "$SELECTED_SKETCHES" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
+              echo
+              echo "Each sketch is compiled for the 3.4C and 4C displays."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No Arduino sketch build was selected." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "${{ steps.route.outputs.firmware_touched }}" == "true" ]]; then
+            echo "Maintained firmware changed; it remains outside the example matrix." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "${{ steps.route.outputs.release_review }}" == "true" ]]; then
+            echo "Binary or archive changes require explicit release review." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  build:
+    name: Build ${{ matrix.sketch_name }} / ${{ matrix.profile_id }} (${{ matrix.screen }})
+    needs: discover
+    if: needs.discover.outputs.has_sketches == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install Arduino-ESP32
+        shell: bash
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls "$ESP32_INDEX_URL"
+          arduino-cli core install "esp32:esp32@$ARDUINO_CORE_VERSION" \
+            --additional-urls "$ESP32_INDEX_URL"
+
+      - name: Compile sketch
+        shell: bash
+        env:
+          SKETCH_NAME: ${{ matrix.sketch_name }}
+          SKETCH_PATH: ${{ matrix.sketch }}
+          SCREEN_NAME: ${{ matrix.screen }}
+          SCREEN_DEFINE: ${{ matrix.screen_define }}
+        run: |
+          set -euo pipefail
+          library_root="$GITHUB_WORKSPACE/examples/arduino/libraries"
+          build_path="$RUNNER_TEMP/arduino-build/$SKETCH_NAME/$SCREEN_NAME"
+
+          arduino-cli compile \
+            --fqbn "$ARDUINO_FQBN" \
+            --warnings all \
+            --libraries "$library_root" \
+            --build-path "$build_path" \
+            --build-property "compiler.cpp.extra_flags=-DCURRENT_SCREEN=$SCREEN_DEFINE" \
+            "$SKETCH_PATH"
+
+      - name: Package flashable example artifact
+        id: package
+        shell: bash
+        env:
+          ARTIFACT_KEY: ${{ matrix.artifact_key }}
+        run: |
+          set -euo pipefail
+          git_sha="$(git rev-parse HEAD)"
+          build_path="$RUNNER_TEMP/arduino-build/${{ matrix.sketch_name }}/${{ matrix.screen }}"
+          output="$RUNNER_TEMP/example-artifacts/$ARTIFACT_KEY"
+          zip_output="$RUNNER_TEMP/example-artifacts/${ARTIFACT_KEY}.zip"
+          test "$BSP_REFERENCE_RELATIONSHIP" = "reference-only"
+          python .github/scripts/package_build_artifact.py arduino \
+            --build-dir "$build_path" --output-dir "$output" \
+            --zip-output "$zip_output" \
+            --product-label "ESP32-P4-WIFI6-Touch-LCD-XC" --variant "${{ matrix.variant }}" \
+            --variant-id "${{ matrix.variant_id }}" \
+            --resolution "${{ matrix.resolution }}" --configuration "${{ matrix.configuration }}" \
+            --framework-version "$ARDUINO_CORE_VERSION" --target esp32p4 \
+            --project "${{ matrix.sketch }}" --sketch "${{ matrix.sketch_name }}" \
+            --fqbn "$ARDUINO_FQBN" --profile-id "${{ matrix.profile_id }}" \
+            --build-options "$build_path/build.options.json" \
+            --source-root "$GITHUB_WORKSPACE" --git-sha "$git_sha" \
+            --bsp-sha "$BSP_REFERENCE_SOURCE_SHA" \
+            --bsp-source-tree "$BSP_REFERENCE_SOURCE_TREE" \
+            --bsp-component-tree "$BSP_REFERENCE_COMPONENT_TREE" \
+            --bsp-version "$BSP_REFERENCE_VERSION"
+          validation_args=(
+            --target esp32p4 --product-sha "$git_sha"
+            --fqbn "$ARDUINO_FQBN" --framework-version "$ARDUINO_CORE_VERSION"
+            --bsp-sha "$BSP_REFERENCE_SOURCE_SHA"
+            --bsp-source-tree "$BSP_REFERENCE_SOURCE_TREE"
+            --bsp-component-tree "$BSP_REFERENCE_COMPONENT_TREE"
+            --bsp-version "$BSP_REFERENCE_VERSION" --bsp-linked false
+            --build-dir "$build_path" --build-options "$build_path/build.options.json"
+            --source-root "$GITHUB_WORKSPACE"
+          )
+          python .github/scripts/validate_flash_artifact.py "$output" "${validation_args[@]}"
+          python .github/scripts/validate_flash_artifact.py "$zip_output" \
+            --equivalent-directory "$output" "${validation_args[@]}"
+          echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
+          echo "path=$zip_output" >> "$GITHUB_OUTPUT"
+
+      - name: Upload flashable example artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: ${{ steps.package.outputs.path }}
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 14 || 30 }}

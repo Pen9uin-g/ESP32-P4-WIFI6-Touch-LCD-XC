@@ -8,6 +8,7 @@
 #include "esp_brookesia.hpp"
 
 #include "bsp/touch.h"
+#include "esp_cache.h"
 #include "esp_lib_utils.h"
 #include "esp_check.h"
 #include "esp_err.h"
@@ -47,80 +48,54 @@ LV_IMG_DECLARE(img_app_camera);
 #error "Unsupported BSP LCD color format"
 #endif
 
-#if defined(CONFIG_CAMERA_OV5647_MIPI_RAW8_800x1280_50FPS)
-#define CAMERA_FALLBACK_CAPTURE_WIDTH  800
-#define CAMERA_FALLBACK_CAPTURE_HEIGHT 1280
-#elif defined(CONFIG_CAMERA_OV5647_MIPI_RAW8_800x640_50FPS)
-#define CAMERA_FALLBACK_CAPTURE_WIDTH  800
-#define CAMERA_FALLBACK_CAPTURE_HEIGHT 640
-#elif defined(CONFIG_CAMERA_OV5647_MIPI_RAW8_800x800_50FPS)
-#define CAMERA_FALLBACK_CAPTURE_WIDTH  800
-#define CAMERA_FALLBACK_CAPTURE_HEIGHT 800
-#elif defined(CONFIG_CAMERA_OV5647_MIPI_RAW10_1920x1080_30FPS)
-#define CAMERA_FALLBACK_CAPTURE_WIDTH  1920
-#define CAMERA_FALLBACK_CAPTURE_HEIGHT 1080
-#elif defined(CONFIG_CAMERA_OV5647_MIPI_RAW10_1280x960_BINNING_45FPS)
-#define CAMERA_FALLBACK_CAPTURE_WIDTH  1280
-#define CAMERA_FALLBACK_CAPTURE_HEIGHT 960
-#else
-#define CAMERA_FALLBACK_CAPTURE_WIDTH  BSP_LCD_H_RES
-#define CAMERA_FALLBACK_CAPTURE_HEIGHT BSP_LCD_V_RES
-#endif
 
 namespace esp_brookesia::apps
 {
-    struct CoverCropConfig {
-        uint32_t offset_x;
-        uint32_t offset_y;
-        uint32_t width;
-        uint32_t height;
-        float scale_x;
-        float scale_y;
+    // The PPA truncates SRM scale factors to 1/16 increments. Calculate the
+    // centered output rectangle with the same precision so the complete camera
+    // frame stays visible and the programmed offsets match the hardware result.
+    static constexpr uint32_t CAMERA_PPA_SCALE_STEPS_PER_UNIT = 16;
+
+    struct ContainFitConfig {
+        uint32_t output_width;
+        uint32_t output_height;
+        uint32_t output_offset_x;
+        uint32_t output_offset_y;
+        float scale;
     };
 
-    static CoverCropConfig computeCoverCrop(uint32_t src_w, uint32_t src_h, uint32_t dst_w, uint32_t dst_h)
+    static ContainFitConfig computeContainFit(uint32_t src_w, uint32_t src_h, uint32_t dst_w, uint32_t dst_h)
     {
-        CoverCropConfig crop = {
-            .offset_x = 0,
-            .offset_y = 0,
-            .width = src_w,
-            .height = src_h,
-            .scale_x = 1.0f,
-            .scale_y = 1.0f,
+        ContainFitConfig fit = {
+            .output_width = 0,
+            .output_height = 0,
+            .output_offset_x = 0,
+            .output_offset_y = 0,
+            .scale = 0.0f,
         };
 
         if (src_w == 0 || src_h == 0 || dst_w == 0 || dst_h == 0) {
-            crop.width = crop.width ? crop.width : 1;
-            crop.height = crop.height ? crop.height : 1;
-            return crop;
+            return fit;
         }
 
-        if (static_cast<uint64_t>(src_w) * dst_h > static_cast<uint64_t>(src_h) * dst_w) {
-            crop.width = static_cast<uint32_t>((static_cast<uint64_t>(src_h) * dst_w) / dst_h);
-            crop.height = src_h;
-        } else {
-            crop.width = src_w;
-            crop.height = static_cast<uint32_t>((static_cast<uint64_t>(src_w) * dst_h) / dst_w);
+        const uint64_t scale_numerator_x = static_cast<uint64_t>(dst_w) * CAMERA_PPA_SCALE_STEPS_PER_UNIT;
+        const uint64_t scale_numerator_y = static_cast<uint64_t>(dst_h) * CAMERA_PPA_SCALE_STEPS_PER_UNIT;
+        uint32_t scale_steps_x = static_cast<uint32_t>(scale_numerator_x / src_w);
+        uint32_t scale_steps_y = static_cast<uint32_t>(scale_numerator_y / src_h);
+        uint32_t scale_steps = (scale_steps_x < scale_steps_y) ? scale_steps_x : scale_steps_y;
+        if (scale_steps == 0) {
+            return fit;
         }
 
-        crop.width = crop.width ? crop.width : 1;
-        crop.height = crop.height ? crop.height : 1;
-        crop.offset_x = (src_w - crop.width) / 2;
-        crop.offset_y = (src_h - crop.height) / 2;
+        const uint64_t scaled_width = static_cast<uint64_t>(src_w) * scale_steps;
+        const uint64_t scaled_height = static_cast<uint64_t>(src_h) * scale_steps;
+        fit.output_width = static_cast<uint32_t>(scaled_width / CAMERA_PPA_SCALE_STEPS_PER_UNIT);
+        fit.output_height = static_cast<uint32_t>(scaled_height / CAMERA_PPA_SCALE_STEPS_PER_UNIT);
+        fit.output_offset_x = (dst_w - fit.output_width) / 2;
+        fit.output_offset_y = (dst_h - fit.output_height) / 2;
+        fit.scale = static_cast<float>(scale_steps) / CAMERA_PPA_SCALE_STEPS_PER_UNIT;
 
-        // Prefer a 1:1 center crop when the sensor frame is larger than the LCD.
-        // Fractional PPA downscale can round the last column/row down and leave a flickering edge.
-        if (crop.width >= dst_w && crop.height >= dst_h) {
-            crop.offset_x += (crop.width - dst_w) / 2;
-            crop.offset_y += (crop.height - dst_h) / 2;
-            crop.width = dst_w;
-            crop.height = dst_h;
-        }
-
-        crop.scale_x = static_cast<float>(dst_w) / static_cast<float>(crop.width);
-        crop.scale_y = static_cast<float>(dst_h) / static_cast<float>(crop.height);
-
-        return crop;
+        return fit;
     }
 
     Camera *Camera::_instance = nullptr;
@@ -134,10 +109,7 @@ namespace esp_brookesia::apps
         return _instance;
     }
 
-    Camera::Camera(bool use_status_bar, bool use_navigation_bar) : systems::phone::App(
-                                                                       "Camera", &img_app_camera, true,
-                                                                       use_status_bar, use_navigation_bar
-                                                                   )
+    Camera::Camera(bool use_status_bar, bool use_navigation_bar) : App("Camera", &img_app_camera, true, use_status_bar, use_navigation_bar)
     {
     }
 
@@ -150,25 +122,25 @@ namespace esp_brookesia::apps
     {
         ESP_UTILS_LOGD("Run");
 
-        bsp_display_lock(-1);
+        bsp_extra_display_lock(-1);
         lv_obj_clean(lv_scr_act());
         lv_obj_set_style_bg_color(lv_scr_act(), lv_color_black(), LV_PART_MAIN);
         lv_obj_set_style_bg_opa(lv_scr_act(), LV_OPA_COVER, LV_PART_MAIN);
         _status_label = lv_label_create(lv_scr_act());
         lv_label_set_text(_status_label, "Camera");
-        lv_obj_set_width(_status_label, LV_HOR_RES);
+        lv_obj_set_width(_status_label, BSP_LCD_H_RES);
         lv_obj_set_style_text_align(_status_label, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
         lv_obj_set_style_text_font(_status_label, &lv_font_montserrat_30, LV_PART_MAIN);
         lv_obj_set_style_text_color(_status_label, lv_color_white(), LV_PART_MAIN);
         lv_obj_align(_status_label, LV_ALIGN_CENTER, 0, 0);
-        bsp_display_unlock();
+        bsp_extra_display_unlock();
 
         if (!startPreview()) {
-            bsp_display_lock(-1);
+            bsp_extra_display_lock(-1);
             if (_status_label) {
                 lv_label_set_text(_status_label, "camera error");
             }
-            bsp_display_unlock();
+            bsp_extra_display_unlock();
         }
 
         return true;
@@ -187,12 +159,12 @@ namespace esp_brookesia::apps
         ESP_UTILS_LOGD("Close");
         requestStopPreview();
 
-        bsp_display_lock(-1);
+        bsp_extra_display_lock(-1);
         if (_status_label) {
             lv_obj_del(_status_label);
             _status_label = nullptr;
         }
-        bsp_display_unlock();
+        bsp_extra_display_unlock();
         return true;
     }
 
@@ -218,7 +190,7 @@ namespace esp_brookesia::apps
     bool Camera::resume()
     {
         ESP_UTILS_LOGD("Resume");
-        return true;
+        return startPreview();
     }
 
     bool Camera::startPreview()
@@ -279,8 +251,8 @@ namespace esp_brookesia::apps
                     .i2c_handle = bsp_i2c_get_handle(),
                     .freq = CONFIG_BSP_I2C_CLK_SPEED_HZ,
                 },
-                .reset_pin = -1,
-                .pwdn_pin = -1,
+                .reset_pin = GPIO_NUM_NC,
+                .pwdn_pin = GPIO_NUM_NC,
             },
         };
 
@@ -319,42 +291,6 @@ namespace esp_brookesia::apps
         }
 
         struct v4l2_format format = {};
-        auto set_capture_format = [&](uint32_t width, uint32_t height) -> bool {
-            memset(&format, 0, sizeof(format));
-            format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-            format.fmt.pix.width = width;
-            format.fmt.pix.height = height;
-            format.fmt.pix.pixelformat = CAMERA_VIDEO_FMT;
-
-            return ioctl(_video_fd, VIDIOC_S_FMT, &format) == 0;
-        };
-
-        // Prefer the panel size when the sensor supports it. Some camera modes are
-        // fixed by Kconfig, so fall back to the known native capture mode and adapt
-        // the preview to the LCD with PPA.
-        if (!set_capture_format(BSP_LCD_H_RES, BSP_LCD_V_RES)) {
-            ESP_LOGW(
-                ESP_UTILS_LOG_TAG,
-                "VIDIOC_S_FMT %" PRIu32 "x%" PRIu32 " failed, trying fallback %" PRIu32 "x%" PRIu32,
-                static_cast<uint32_t>(BSP_LCD_H_RES),
-                static_cast<uint32_t>(BSP_LCD_V_RES),
-                static_cast<uint32_t>(CAMERA_FALLBACK_CAPTURE_WIDTH),
-                static_cast<uint32_t>(CAMERA_FALLBACK_CAPTURE_HEIGHT)
-            );
-            if (!set_capture_format(CAMERA_FALLBACK_CAPTURE_WIDTH, CAMERA_FALLBACK_CAPTURE_HEIGHT)) {
-                ESP_LOGE(
-                    ESP_UTILS_LOG_TAG,
-                    "VIDIOC_S_FMT fallback %" PRIu32 "x%" PRIu32 " failed",
-                    static_cast<uint32_t>(CAMERA_FALLBACK_CAPTURE_WIDTH),
-                    static_cast<uint32_t>(CAMERA_FALLBACK_CAPTURE_HEIGHT)
-                );
-                ::close(_video_fd);
-                _video_fd = -1;
-                return ESP_FAIL;
-            }
-        }
-
-        memset(&format, 0, sizeof(format));
         format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         if (ioctl(_video_fd, VIDIOC_G_FMT, &format) != 0) {
             ESP_LOGE(ESP_UTILS_LOG_TAG, "VIDIOC_G_FMT failed");
@@ -362,35 +298,70 @@ namespace esp_brookesia::apps
             _video_fd = -1;
             return ESP_FAIL;
         }
+        if (format.fmt.pix.width == 0 || format.fmt.pix.height == 0) {
+            ESP_LOGE(ESP_UTILS_LOG_TAG, "Camera returned an invalid capture size");
+            ::close(_video_fd);
+            _video_fd = -1;
+            return ESP_ERR_INVALID_SIZE;
+        }
+
+        // The CSI node is initialized from the OV5647 sensor mode and rejects
+        // width/height changes through VIDIOC_S_FMT. Keep that native size and
+        // only request the LCD color format when the default differs.
+        if (format.fmt.pix.pixelformat != CAMERA_VIDEO_FMT) {
+            struct v4l2_format requested_format = format;
+            requested_format.fmt.pix.pixelformat = CAMERA_VIDEO_FMT;
+            if (ioctl(_video_fd, VIDIOC_S_FMT, &requested_format) != 0) {
+                ESP_LOGE(
+                    ESP_UTILS_LOG_TAG,
+                    "VIDIOC_S_FMT color conversion failed for %" PRIu32 "x%" PRIu32,
+                    format.fmt.pix.width,
+                    format.fmt.pix.height
+                );
+                ::close(_video_fd);
+                _video_fd = -1;
+                return ESP_FAIL;
+            }
+
+            memset(&format, 0, sizeof(format));
+            format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            if (ioctl(_video_fd, VIDIOC_G_FMT, &format) != 0) {
+                ESP_LOGE(ESP_UTILS_LOG_TAG, "VIDIOC_G_FMT after color conversion failed");
+                ::close(_video_fd);
+                _video_fd = -1;
+                return ESP_FAIL;
+            }
+        }
+
+        if (format.fmt.pix.pixelformat != CAMERA_VIDEO_FMT) {
+            ESP_LOGE(
+                ESP_UTILS_LOG_TAG,
+                "Unsupported camera pixel format: 0x%08" PRIx32,
+                format.fmt.pix.pixelformat
+            );
+            ::close(_video_fd);
+            _video_fd = -1;
+            return ESP_ERR_NOT_SUPPORTED;
+        }
 
         _camera_width = format.fmt.pix.width;
         _camera_height = format.fmt.pix.height;
-        _camera_buffer_size = _camera_width * _camera_height * CAMERA_BYTES_PER_PIXEL;
-        ESP_LOGI(ESP_UTILS_LOG_TAG, "Camera format: %" PRIu32 "x%" PRIu32, _camera_width, _camera_height);
-
-        ESP_RETURN_ON_ERROR(tuneCameraControls(), ESP_UTILS_LOG_TAG, "Tune camera controls failed");
-
-        return ESP_OK;
-    }
-
-    esp_err_t Camera::tuneCameraControls()
-    {
-        struct v4l2_ext_controls controls = {};
-        struct v4l2_ext_control control[1] = {};
-
-        controls.ctrl_class = V4L2_CTRL_CLASS_USER;
-        controls.count = 1;
-        controls.controls = control;
-        // OV5647 maps this control to its AE target registers in esp_cam_sensor v0.9.0.
-        control[0].id = V4L2_CID_EXPOSURE;
-        control[0].value = OV5647_AE_TARGET_LEVEL;
-
-        if (ioctl(_video_fd, VIDIOC_S_EXT_CTRLS, &controls) != 0) {
-            ESP_LOGW(ESP_UTILS_LOG_TAG, "Set OV5647 AE target 0x%x failed, keep sensor default", OV5647_AE_TARGET_LEVEL);
-            return ESP_OK;
+        _camera_buffer_size = format.fmt.pix.sizeimage;
+        if (_camera_buffer_size == 0 && format.fmt.pix.bytesperline != 0) {
+            _camera_buffer_size = format.fmt.pix.bytesperline * _camera_height;
+        }
+        if (_camera_buffer_size == 0) {
+            _camera_buffer_size = _camera_width * _camera_height * CAMERA_BYTES_PER_PIXEL;
         }
 
-        ESP_LOGI(ESP_UTILS_LOG_TAG, "OV5647 AE target: 0x%x", OV5647_AE_TARGET_LEVEL);
+        ESP_LOGI(
+            ESP_UTILS_LOG_TAG,
+            "Camera format: %" PRIu32 "x%" PRIu32 ", buffer: %u bytes",
+            _camera_width,
+            _camera_height,
+            static_cast<unsigned>(_camera_buffer_size)
+        );
+
         return ESP_OK;
     }
 
@@ -451,20 +422,37 @@ namespace esp_brookesia::apps
         _display_panel = bsp_display_get_panel_handle();
         ESP_RETURN_ON_FALSE(_display_panel != nullptr, ESP_ERR_INVALID_STATE, ESP_UTILS_LOG_TAG, "LCD panel is not ready");
 
+        esp_err_t ret = ESP_OK;
 #if CONFIG_BSP_LCD_DPI_BUFFER_NUMS >= 3
-        ESP_RETURN_ON_ERROR(esp_lcd_dpi_panel_get_frame_buffer(_display_panel, CONFIG_BSP_LCD_DPI_BUFFER_NUMS, &_lcd_buffers[0], &_lcd_buffers[1], &_lcd_buffers[2]), ESP_UTILS_LOG_TAG, "Get LCD frame buffers failed");
+        ret = esp_lcd_dpi_panel_get_frame_buffer(
+                  _display_panel,
+                  CONFIG_BSP_LCD_DPI_BUFFER_NUMS,
+                  &_lcd_buffers[0],
+                  &_lcd_buffers[1],
+                  &_lcd_buffers[2]
+              );
 #elif CONFIG_BSP_LCD_DPI_BUFFER_NUMS == 2
-        ESP_RETURN_ON_ERROR(esp_lcd_dpi_panel_get_frame_buffer(_display_panel, CONFIG_BSP_LCD_DPI_BUFFER_NUMS, &_lcd_buffers[0], &_lcd_buffers[1]), ESP_UTILS_LOG_TAG, "Get LCD frame buffers failed");
+        ret = esp_lcd_dpi_panel_get_frame_buffer(
+                  _display_panel,
+                  CONFIG_BSP_LCD_DPI_BUFFER_NUMS,
+                  &_lcd_buffers[0],
+                  &_lcd_buffers[1]
+              );
 #else
 #error "Camera preview needs at least two LCD frame buffers"
 #endif
+        ESP_RETURN_ON_ERROR(ret, ESP_UTILS_LOG_TAG, "Get LCD frame buffers failed");
         _current_lcd_buffer_index = 0;
 
         if (_ppa_srm_handle == nullptr) {
             ppa_client_config_t ppa_srm_config = {
                 .oper_type = PPA_OPERATION_SRM,
             };
-            ESP_RETURN_ON_ERROR(ppa_register_client(&ppa_srm_config, &_ppa_srm_handle), ESP_UTILS_LOG_TAG, "Register PPA SRM failed");
+            ESP_RETURN_ON_ERROR(
+                ppa_register_client(&ppa_srm_config, &_ppa_srm_handle),
+                ESP_UTILS_LOG_TAG,
+                "Register PPA SRM failed"
+            );
         }
 
         bsp_display_cfg_t touch_cfg = {
@@ -477,27 +465,73 @@ namespace esp_brookesia::apps
                 .mirror_y = 0,
             },
         };
-        ESP_RETURN_ON_ERROR(bsp_touch_new(&touch_cfg, &_touch_handle), ESP_UTILS_LOG_TAG, "Create touch handle failed");
+        ret = bsp_touch_new(&touch_cfg, &_touch_handle);
+        if (ret != ESP_OK) {
+            stopDummyPreview();
+            return ret;
+        }
 
-        ESP_RETURN_ON_ERROR(esp_lv_adapter_set_dummy_draw(_display, true), ESP_UTILS_LOG_TAG, "Enable dummy draw failed");
+        ret = esp_lv_adapter_set_dummy_draw(_display, true);
+        if (ret != ESP_OK) {
+            stopDummyPreview();
+            return ret;
+        }
         _dummy_enabled = true;
 
-        ESP_RETURN_ON_ERROR(esp_lv_adapter_pause(-1), ESP_UTILS_LOG_TAG, "Pause LVGL failed");
+        ret = esp_lv_adapter_pause(-1);
+        if (ret != ESP_OK) {
+            stopDummyPreview();
+            return ret;
+        }
         _lvgl_paused = true;
 
+        // SRM writes only the scaled output rectangle. Clear and flush every
+        // framebuffer once so the untouched letterbox area remains black.
+        const size_t lcd_buffer_size =
+            static_cast<size_t>(BSP_LCD_H_RES) * BSP_LCD_V_RES * CAMERA_BYTES_PER_PIXEL;
+        for (int i = 0; i < CONFIG_BSP_LCD_DPI_BUFFER_NUMS; i++) {
+            memset(_lcd_buffers[i], 0, lcd_buffer_size);
+            ret = esp_cache_msync(_lcd_buffers[i], lcd_buffer_size, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
+            if (ret != ESP_OK) {
+                stopDummyPreview();
+                return ret;
+            }
+        }
+
+        const ContainFitConfig fit = computeContainFit(
+            _camera_width,
+            _camera_height,
+            BSP_LCD_H_RES,
+            BSP_LCD_V_RES
+        );
+
+        ESP_LOGI(
+            ESP_UTILS_LOG_TAG,
+            "Camera preview: %" PRIu32 "x%" PRIu32 " -> %" PRIu32 "x%" PRIu32
+            " at (%" PRIu32 ",%" PRIu32 ") on %dx%d, %d frame buffers",
+            _camera_width,
+            _camera_height,
+            fit.output_width,
+            fit.output_height,
+            fit.output_offset_x,
+            fit.output_offset_y,
+            BSP_LCD_H_RES,
+            BSP_LCD_V_RES,
+            CONFIG_BSP_LCD_DPI_BUFFER_NUMS
+        );
         return ESP_OK;
     }
 
     void Camera::stopDummyPreview()
     {
-        if (_lvgl_paused) {
-            esp_lv_adapter_resume();
-            _lvgl_paused = false;
-        }
-
         if (_dummy_enabled && _display) {
             esp_lv_adapter_set_dummy_draw(_display, false);
             _dummy_enabled = false;
+        }
+
+        if (_lvgl_paused) {
+            esp_lv_adapter_resume();
+            _lvgl_paused = false;
         }
 
         if (_touch_handle) {
@@ -505,6 +539,10 @@ namespace esp_brookesia::apps
             _touch_handle = nullptr;
         }
 
+        memset(_lcd_buffers, 0, sizeof(_lcd_buffers));
+        _display_panel = nullptr;
+        _display = nullptr;
+        _current_lcd_buffer_index = 0;
         _touch_active = false;
     }
 
@@ -555,11 +593,15 @@ namespace esp_brookesia::apps
 
     esp_err_t Camera::handleFrame()
     {
-        int buffer_index = (_current_lcd_buffer_index + 1) % CONFIG_BSP_LCD_DPI_BUFFER_NUMS;
-        if (_lcd_buffers[buffer_index] == nullptr) {
-            ESP_LOGE(ESP_UTILS_LOG_TAG, "LCD frame buffer %d is not ready", buffer_index);
-            return ESP_ERR_INVALID_STATE;
-        }
+        const int lcd_buffer_index =
+            (_current_lcd_buffer_index + 1) % CONFIG_BSP_LCD_DPI_BUFFER_NUMS;
+        ESP_RETURN_ON_FALSE(
+            _lcd_buffers[lcd_buffer_index] != nullptr,
+            ESP_ERR_INVALID_STATE,
+            ESP_UTILS_LOG_TAG,
+            "LCD frame buffer %d is not ready",
+            lcd_buffer_index
+        );
 
         struct v4l2_buffer v4l2_buf = {};
         v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -569,34 +611,44 @@ namespace esp_brookesia::apps
             ESP_LOGE(ESP_UTILS_LOG_TAG, "VIDIOC_DQBUF failed");
             return ESP_FAIL;
         }
+        if (v4l2_buf.index >= CAMERA_BUFFER_COUNT) {
+            ESP_LOGE(
+                ESP_UTILS_LOG_TAG,
+                "Camera returned invalid buffer index: %u",
+                static_cast<unsigned>(v4l2_buf.index)
+            );
+            return ESP_ERR_INVALID_STATE;
+        }
 
-        const uint32_t panel_w = BSP_LCD_H_RES;
-        const uint32_t panel_h = BSP_LCD_V_RES;
-        const uint32_t target_w = panel_w;
-        const uint32_t target_h = panel_h;
-        CoverCropConfig crop = computeCoverCrop(_camera_width, _camera_height, target_w, target_h);
+        const uint32_t display_w = BSP_LCD_H_RES;
+        const uint32_t display_h = BSP_LCD_V_RES;
+        const ContainFitConfig fit = computeContainFit(_camera_width, _camera_height, display_w, display_h);
+        ESP_RETURN_ON_FALSE(fit.scale > 0.0f, ESP_ERR_INVALID_SIZE, ESP_UTILS_LOG_TAG, "Invalid camera fit");
 
         ppa_srm_oper_config_t srm_config = {};
         srm_config.in.buffer = _camera_buffers[v4l2_buf.index];
         srm_config.in.pic_w = _camera_width;
         srm_config.in.pic_h = _camera_height;
-        srm_config.in.block_w = crop.width;
-        srm_config.in.block_h = crop.height;
-        srm_config.in.block_offset_x = crop.offset_x;
-        srm_config.in.block_offset_y = crop.offset_y;
+        srm_config.in.block_w = _camera_width;
+        srm_config.in.block_h = _camera_height;
+        srm_config.in.block_offset_x = 0;
+        srm_config.in.block_offset_y = 0;
         srm_config.in.srm_cm = CAMERA_PPA_COLOR_MODE;
 
-        srm_config.out.buffer = _lcd_buffers[buffer_index];
-        srm_config.out.buffer_size = ALIGN_UP(panel_w * panel_h * CAMERA_BYTES_PER_PIXEL, _data_cache_line_size);
-        srm_config.out.pic_w = panel_w;
-        srm_config.out.pic_h = panel_h;
-        srm_config.out.block_offset_x = 0;
-        srm_config.out.block_offset_y = 0;
+        srm_config.out.buffer = _lcd_buffers[lcd_buffer_index];
+        srm_config.out.buffer_size = ALIGN_UP(
+            display_w * display_h * CAMERA_BYTES_PER_PIXEL,
+            _data_cache_line_size
+        );
+        srm_config.out.pic_w = display_w;
+        srm_config.out.pic_h = display_h;
+        srm_config.out.block_offset_x = fit.output_offset_x;
+        srm_config.out.block_offset_y = fit.output_offset_y;
         srm_config.out.srm_cm = CAMERA_PPA_COLOR_MODE;
 
         srm_config.rotation_angle = PPA_SRM_ROTATION_ANGLE_0;
-        srm_config.scale_x = crop.scale_x;
-        srm_config.scale_y = crop.scale_y;
+        srm_config.scale_x = fit.scale;
+        srm_config.scale_y = fit.scale;
         srm_config.mirror_x = 0;
         srm_config.mirror_y = 0;
         srm_config.rgb_swap = 0;
@@ -606,15 +658,16 @@ namespace esp_brookesia::apps
         esp_err_t ret = ppa_do_scale_rotate_mirror(_ppa_srm_handle, &srm_config);
         if (ret == ESP_OK && _dummy_enabled) {
             ret = esp_lv_adapter_dummy_draw_blit(
-                _display,
-                0,
-                0,
-                panel_w,
-                panel_h,
-                _lcd_buffers[buffer_index],
-                true);
+                      _display,
+                      0,
+                      0,
+                      display_w,
+                      display_h,
+                      _lcd_buffers[lcd_buffer_index],
+                      true
+                  );
             if (ret == ESP_OK) {
-                _current_lcd_buffer_index = buffer_index;
+                _current_lcd_buffer_index = lcd_buffer_index;
             }
         }
 

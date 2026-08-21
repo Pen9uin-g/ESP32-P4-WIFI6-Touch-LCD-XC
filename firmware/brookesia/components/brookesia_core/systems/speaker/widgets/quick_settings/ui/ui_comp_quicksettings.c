@@ -464,4 +464,3 @@ lv_obj_t * ui_ContainerQuickSettings_create(lv_obj_t * comp_parent)
     // ui_comp_ContainerQuickSettings_create_hook(cui_ContainerQuickSettings);
     return cui_ContainerQuickSettings;
 }
-

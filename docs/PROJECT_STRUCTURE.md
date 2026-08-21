@@ -1,7 +1,9 @@
 # Project Structure
 
-This repository is organized as a board package with examples, firmware,
-schematics, and repository-level documentation.
+[中文](PROJECT_STRUCTURE_ZH.md)
+
+This repository is organized as a board package with first-party examples,
+maintained firmware source, schematics, and repository-level documentation.
 
 ## Top Level
 
@@ -15,7 +17,7 @@ schematics, and repository-level documentation.
 | `.github/` | CI workflow and helper scripts |
 | `LICENSE` | Apache license text |
 
-## ESP-IDF Projects
+## ESP-IDF Example Projects
 
 Buildable ESP-IDF projects are expected to contain:
 
@@ -34,6 +36,11 @@ Buildable ESP-IDF projects are expected to contain:
 Generated directories such as `build/`, `managed_components/`,
 `dependencies.lock`, and local `sdkconfig` files should not be committed.
 
+The ESP-IDF examples under `examples/esp-idf/` are the default product build
+surface. The `firmware/` tree is maintained separately and remains outside the
+default example matrix. Its dedicated workflow builds only the rev3.x `3_4c`
+and `4c` display profiles; see [Firmware Source Boundary](FIRMWARE.md).
+
 ## Example Documentation
 
 Every hardware-facing example should document:
@@ -50,14 +57,18 @@ removing projects.
 
 ## CI Expectations
 
-The CI helper scripts discover buildable ESP-IDF projects under:
+The CI helper scripts discover only first-party buildable ESP-IDF examples
+under:
 
 - `examples/esp-idf/`
-- `firmware/`
 
-New project directories should be independently buildable with:
+New example directories should be independently buildable with:
 
 ```bash
 idf.py set-target esp32p4
 idf.py build
 ```
+
+Repository policy and Markdown checks run in a separate always-visible
+workflow. Documentation-only changes do not start the expensive example
+matrix.

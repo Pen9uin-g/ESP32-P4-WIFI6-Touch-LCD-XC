@@ -1,0 +1,80 @@
+name: Maintained firmware
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maintained-firmware-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  discover:
+    name: Route maintained firmware changes
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.route.outputs.firmware_matrix }}
+      has_firmware: ${{ steps.route.outputs.has_firmware }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - id: route
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            python .github/scripts/ci_change_router.py --base-ref "${{ github.event.pull_request.base.sha }}" --head-ref "${{ github.event.pull_request.head.sha }}"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" || "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+            python .github/scripts/ci_change_router.py --all
+          else
+            python .github/scripts/ci_change_router.py --base-ref "${{ github.event.before }}" --head-ref "${{ github.sha }}"
+          fi
+
+  build:
+    name: Build maintained firmware / ${{ matrix.variant }} / ${{ matrix.profile_id }}
+    needs: discover
+    if: needs.discover.outputs.has_firmware == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.discover.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Build ESP-IDF v5.5.5 firmware profile and panel variant
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.5
+          target: esp32p4
+          path: ${{ matrix.project }}
+          command: ${{ matrix.command }}
+      - id: package
+        shell: bash
+        env:
+          ARTIFACT_KEY: ${{ matrix.artifact_key }}
+        run: |
+          set -euo pipefail
+          git_sha="$(git rev-parse HEAD)"
+          output="$RUNNER_TEMP/firmware-artifacts/$ARTIFACT_KEY"
+          python .github/scripts/package_build_artifact.py esp-idf \
+            --build-dir "${{ matrix.project }}/${{ matrix.build_dir }}" --output-dir "$output" \
+            --product-label "ESP32-P4-WIFI6-Touch-LCD-XC" --variant "${{ matrix.variant }}" --variant-id "${{ matrix.variant_id }}" \
+            --resolution "${{ matrix.resolution }}" --configuration default --framework-version v5.5.5 --target esp32p4 \
+            --project "${{ matrix.project }}" --profile-id "${{ matrix.profile_id }}" --artifact-kind maintained-firmware \
+            --sdkconfig "${{ matrix.project }}/${{ matrix.sdkconfig }}" --scope "maintained firmware" --git-sha "$git_sha"
+          echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
+          echo "path=$output" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: ${{ steps.package.outputs.path }}
+          if-no-files-found: error
+          retention-days: ${{ github.event_name == 'pull_request' && 14 || 30 }}

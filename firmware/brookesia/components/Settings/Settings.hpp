@@ -24,9 +24,10 @@ namespace esp_brookesia::apps
     class Settings : public systems::phone::App
     {
     public:
-        static Settings *requestInstance(bool use_status_bar = true, bool use_navigation_bar = false);
+        static Settings *requestInstance(bool use_status_bar = false, bool use_navigation_bar = false);
         ~Settings();
         bool run(void) override;
+        void showRootPage();
         i2c_master_bus_handle_t i2c_bus_handle;
         i2c_master_dev_handle_t pmu_dev_handle;
         static int pmu_register_read(uint8_t devAddr, uint8_t regAddr, uint8_t *data, uint8_t len);
@@ -59,11 +60,13 @@ namespace esp_brookesia::apps
         void destroy_settings_ui();
         void event_handler(lv_event_t *e);
         void open_page(const char *page_name);
+        void close_active_page();
 
         esp_err_t initWifi();
-        
+
     private:
         static Settings *_instance;
+        lv_obj_t *page_root;
         lv_obj_t *list1;
         lv_style_t style_list;
         lv_style_t style_list_btn;

@@ -1,15 +1,23 @@
 # Getting Started
 
+[中文](GETTING_STARTED_ZH.md)
+
 This guide describes the shortest path from a fresh checkout to a running
 ESP-IDF example on the ESP32-P4-WIFI6-Touch-LCD-XC board.
 
 ## Requirements
 
-- ESP-IDF v5.5.x, or a newer version that is compatible with ESP32-P4.
+- ESP-IDF `v5.5.5` or `v6.0.2`, which are the two versions covered by the
+  repository's example CI matrix.
 - Python and Git as required by ESP-IDF.
 - USB-C cable connected to the board USB-UART port.
 - Optional peripherals required by the selected example, such as an SD card or
   camera module.
+
+The board schematic is available at
+[`hardware/schematics/ESP32-P4-WIFI6-Touch-LCD-XC-Schematic.pdf`](../hardware/schematics/ESP32-P4-WIFI6-Touch-LCD-XC-Schematic.pdf).
+Use the [hardware audit](HARDWARE.md) together with the schematic when a
+change touches board pins, display, touch, camera, audio, storage, or USB.
 
 ## Build An ESP-IDF Example
 
@@ -32,11 +40,14 @@ monitor.
 
 ## Build Other Projects
 
-Every ESP-IDF project in this repository has its own `CMakeLists.txt` and
-`main/` directory. Typical project roots are:
+Every first-party example in this repository has its own `CMakeLists.txt` and
+`main/` directory. The default example root is:
 
 - `examples/esp-idf/<example>`
-- `firmware/<application>`
+
+The maintained `firmware/` source tree is a separate delivery surface. It is
+not part of the default example CI matrix; it uses only rev3.x `3_4c` and `4c`
+profiles. See [Firmware Source Boundary](FIRMWARE.md) before changing it.
 
 Use the same commands from inside the project directory, or use ESP-IDF's
 project path option:

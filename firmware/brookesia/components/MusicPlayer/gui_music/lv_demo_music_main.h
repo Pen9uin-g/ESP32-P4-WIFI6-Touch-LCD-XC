@@ -21,7 +21,7 @@ extern "C" {
  *      DEFINES
  *********************/
 
-#define ACTIVE_TRACK_CNT    3
+#define ACTIVE_TRACK_CNT    5
 
 /**********************
  *      TYPEDEFS

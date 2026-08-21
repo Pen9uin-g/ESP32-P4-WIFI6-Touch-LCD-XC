@@ -1,0 +1,47 @@
+{
+  "classification_rules": [
+    {
+      "category": "embedded_upstream",
+      "patterns": [
+        "examples/esp-idf/10_mp4_player/components/esp_extractor/**",
+        "examples/esp-idf/11_esp_brookesia_phone/components/brookesia_core/**",
+        "firmware/brookesia/components/brookesia_core/**"
+      ]
+    }
+  ],
+  "pair_exempt_patterns": [
+    "examples/esp-idf/11_esp_brookesia_phone/README_CN.md"
+  ],
+  "language_link_exempt_patterns": [
+    "examples/esp-idf/11_esp_brookesia_phone/README_CN.md"
+  ],
+  "docs_only_allowed_patterns": [],
+  "homepage_pairs": [
+    {
+      "english": "README.md",
+      "chinese": "README_ZH.md",
+      "profile": "multi-product-hub",
+      "required_components": [
+        "centered_header",
+        "html_h1",
+        "subtitle",
+        "badges",
+        "language_switch",
+        "quick_links",
+        "hero_image",
+        "separator",
+        "h2"
+      ],
+      "required_quick_links": [
+        "product",
+        "documentation",
+        "firmware",
+        "esp_idf",
+        "arduino"
+      ],
+      "required_badges": ["build", "build", "license"],
+      "required_h2_icons": ["✨", "🖥️", "🖥️", "🚀", "🧪", "✅", "🗂️", "📚", "🤝", "📄"],
+      "h3_emoji_allow_patterns": []
+    }
+  ]
+}

@@ -145,4 +145,3 @@ const lv_image_dsc_t speaker_image_middle_app_launcher_default_112_112 = {
   .data_size = sizeof(speaker_image_middle_app_launcher_default_112_112_map),
   .data = speaker_image_middle_app_launcher_default_112_112_map,
 };
-

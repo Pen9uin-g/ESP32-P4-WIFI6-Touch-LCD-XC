@@ -18,10 +18,6 @@ extern "C" {
 
 #define APP_DEMO_MUSIC_ENABLE       1
 #define APP_DEMO_MUSIC_LARGE        0
-#define APP_DEMO_MUSIC_ROUND        0
-#define APP_DEMO_MUSIC_SQUARE       (BSP_LCD_H_RES == BSP_LCD_V_RES)
-#define LV_DEMO_MUSIC_ROUND         APP_DEMO_MUSIC_ROUND
-#define LV_DEMO_MUSIC_SQUARE        APP_DEMO_MUSIC_SQUARE
 
 #if APP_DEMO_MUSIC_ENABLE
 
@@ -47,6 +43,7 @@ void lv_demo_music(lv_obj_t *parent, file_iterator_instance_t *file_iterator);
 void lv_demo_music_close(void);
 
 const char * lv_demo_music_get_title(uint32_t track_id);
+uint32_t lv_demo_music_get_track_count(void);
 const char * lv_demo_music_get_artist(uint32_t track_id);
 const char * lv_demo_music_get_genre(uint32_t track_id);
 uint32_t lv_demo_music_get_track_length(uint32_t track_id);

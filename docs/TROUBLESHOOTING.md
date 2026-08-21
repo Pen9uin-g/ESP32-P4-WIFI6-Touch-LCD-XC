@@ -1,12 +1,14 @@
 # Troubleshooting
 
+[中文](TROUBLESHOOTING_ZH.md)
+
 Use this checklist when an example does not build, flash, or run as expected.
 
 ## Build Issues
 
 - Confirm ESP-IDF is active and supports ESP32-P4.
 - Run `idf.py --version` and compare it with the version documented by the
-  example. ESP-IDF v5.5.x is recommended for CI parity.
+  example. CI currently tests ESP-IDF `v5.5.5` and `v6.0.2`.
 - Remove generated build outputs if configuration changed significantly:
   `build/`, `managed_components/`, `dependencies.lock`, and local `sdkconfig`.
 - Run `idf.py set-target esp32p4` before the first build in a project.
@@ -15,7 +17,13 @@ Use this checklist when an example does not build, flash, or run as expected.
 
 ## Flash And Monitor Issues
 
-- Verify the USB-UART port and use it with `idf.py -p PORT flash monitor`.
+- For ESP-IDF, verify the Type-C UART/USB-UART port and use it with
+  `idf.py -p PORT flash monitor`.
+- For the tested Arduino FQBN, sketch `Serial` uses Hardware CDC on Type-C USB,
+  not the CH343P Type-C UART port. See
+  [Arduino segmented flashing](ARDUINO_FLASHING.md).
+- An Arduino sketch must start with the monitor closed or disconnected. Missing
+  startup lines are expected when the non-blocking logger drops them.
 - Hold or press the board boot/reset controls only when the serial tool cannot
   enter download mode automatically.
 - Try a data-capable USB-C cable and a direct USB port on the host.

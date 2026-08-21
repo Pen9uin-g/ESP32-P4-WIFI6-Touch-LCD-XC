@@ -53,4 +53,3 @@ const lv_image_dsc_t speaker_image_middle_quick_settings_battery_charge_20_20 = 
   .data_size = sizeof(speaker_image_middle_quick_settings_battery_charge_20_20_map),
   .data = speaker_image_middle_quick_settings_battery_charge_20_20_map,
 };
-

@@ -29,7 +29,7 @@ public:
     };
 
 
-    static WlanPage *requestInstance(bool use_status_bar = true, bool use_navigation_bar = true);
+    static WlanPage *requestInstance(bool use_status_bar = false, bool use_navigation_bar = false);
 
     WlanPage(bool use_status_bar, bool use_navigation_bar);
     virtual ~WlanPage();
@@ -53,6 +53,7 @@ private:
     static WlanPage *_instance;
     int wifi_status_icon_state = 0;
 
+    lv_obj_t *page_root;
     lv_obj_t *label;
     lv_obj_t *list1;
     lv_obj_t *status_btn;
@@ -60,9 +61,10 @@ private:
     lv_obj_t *wifi_icon;
 
     lv_obj_t *spinner;
+    lv_obj_t *password_title;
     static lv_obj_t *ta;
     static lv_obj_t *kb;
-    
+
 
     // UI controls that are updated from scan/connect callbacks.
     lv_obj_t *connected_text;
@@ -91,7 +93,7 @@ private:
 
     int wifi_index;
     uint8_t *wifi_ssid;
-    uint8_t *wifi_pwd;
+    char wifi_pwd[65] = {};
     uint8_t connection_num = 0;
 
     void CreateWifiUI();
@@ -105,10 +107,10 @@ private:
     static void wifi_event_handler(void *arg, esp_event_base_t event_base,\
                                 int32_t event_id, void *event_data);
 
-    bool wifi_events_registered = false;                            
+    bool wifi_events_registered = false;
     void start_wifi_events();
     void stop_wifi_events();
-    
+
     bool OpenWifi();
     bool CloseWifi();
     bool ConnWifi();

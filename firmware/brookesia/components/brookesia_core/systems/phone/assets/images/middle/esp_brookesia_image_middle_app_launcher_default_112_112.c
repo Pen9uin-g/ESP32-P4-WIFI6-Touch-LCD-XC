@@ -145,4 +145,3 @@ const lv_image_dsc_t esp_brookesia_image_middle_app_launcher_default_112_112 = {
   .data_size = sizeof(esp_brookesia_image_middle_app_launcher_default_112_112_map),
   .data = esp_brookesia_image_middle_app_launcher_default_112_112_map,
 };
-
