@@ -57,4 +57,3 @@ const lv_image_dsc_t esp_brookesia_image_small_navigation_bar_home_24_24 = {
   .data_size = sizeof(esp_brookesia_image_small_navigation_bar_home_24_24_map),
   .data = esp_brookesia_image_small_navigation_bar_home_24_24_map,
 };
-

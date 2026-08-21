@@ -32,7 +32,9 @@ LV_IMG_DECLARE(img_app_calculator);
 
 #define APP_NAME                "Calculator"
 
-#define ROUND_SCREEN_SAFE_PERCENT   70
+// Adaptation for 360x360 round screen
+#define SCREEN_360_EFFECTIVE_WIDTH  320  // Effective display area for round screen
+#define SCREEN_360_EFFECTIVE_HEIGHT 320
 
 static const char *keyboard_map[] = {
     "C", "/", "x", LV_SYMBOL_BACKSPACE, "\n",
@@ -59,7 +61,7 @@ Calculator *Calculator::requestInstance(bool use_status_bar, bool use_navigation
 }
 
 Calculator::Calculator(bool use_status_bar, bool use_navigation_bar) :
-   systems::phone::App(APP_NAME, &img_app_calculator, true, use_status_bar, use_navigation_bar)
+   App(APP_NAME, &img_app_calculator, true, use_status_bar, use_navigation_bar)
 {
 }
 
@@ -89,13 +91,15 @@ bool Calculator::run(void)
     _width = lv_area_get_width(&visual_area);
     _height = lv_area_get_height(&visual_area);
 
-    bool is_round_screen = (_width == _height);
-    int y_offset = 0;
-    if (is_round_screen) {
-        int safe_side = LV_MIN(_width, _height) * ROUND_SCREEN_SAFE_PERCENT / 100;
-        y_offset = (_height - safe_side) / 2;
-        _width = safe_side;
-        _height = safe_side;
+    // Special handling for 360x360 round screen
+    bool is_round_screen = false;
+    int y_offset = 0;  // Vertical offset
+    if (_width == 360 && _height == 360) {
+        // Round screen, use smaller effective area
+        is_round_screen = true;
+        _width = SCREEN_360_EFFECTIVE_WIDTH;
+        _height = SCREEN_360_EFFECTIVE_HEIGHT;
+        y_offset = 20;  // Offset downward by 20 pixels to avoid round top
     } else if (_width == 0 || _height == 0) {
         _width = 400;
         _height = 600;
@@ -118,7 +122,7 @@ bool Calculator::run(void)
 
     // Adjust keyboard position, round screen offset upward to avoid bottom occlusion
     if (is_round_screen) {
-        lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, -y_offset);
+        lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, -30);  // Offset upward by 30 pixels
     } else {
         lv_obj_align(keyboard, LV_ALIGN_BOTTOM_MID, 0, 0);
     }

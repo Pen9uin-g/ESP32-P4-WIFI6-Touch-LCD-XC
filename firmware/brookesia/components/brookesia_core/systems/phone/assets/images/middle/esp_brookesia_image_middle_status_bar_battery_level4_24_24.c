@@ -57,4 +57,3 @@ const lv_image_dsc_t esp_brookesia_image_middle_status_bar_battery_level4_24_24 
   .data_size = sizeof(esp_brookesia_image_middle_status_bar_battery_level4_24_24_map),
   .data = esp_brookesia_image_middle_status_bar_battery_level4_24_24_map,
 };
-

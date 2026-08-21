@@ -59,9 +59,13 @@ int Manager::installApp(App *app)
     ESP_UTILS_CHECK_FALSE_GOTO(app->setVisualArea(app_visual_area), err, "App set visual area failed");
     ESP_UTILS_CHECK_FALSE_GOTO(app->calibrateVisualArea(), err, "App calibrate visual area failed");
 
-    // Process display
-    ESP_UTILS_CHECK_FALSE_GOTO(display_process_app_installed = display.processAppInstall(app), err,
-                               "Display process app install failed");
+    // Keep only the launcher mutation under the LVGL lock. App hardware and
+    // resource initialization above may block while the boot UI keeps running.
+    {
+        LvLockGuard gui_guard;
+        ESP_UTILS_CHECK_FALSE_GOTO(display_process_app_installed = display.processAppInstall(app), err,
+                                   "Display process app install failed");
+    }
 
     // Update free app id
     _app_free_id++;
@@ -69,8 +73,11 @@ int Manager::installApp(App *app)
     return app->getId();
 
 err:
-    if (display_process_app_installed && !display.processAppUninstall(app)) {
-        ESP_UTILS_LOGE("Display process app uninstall failed");
+    if (display_process_app_installed) {
+        LvLockGuard gui_guard;
+        if (!display.processAppUninstall(app)) {
+            ESP_UTILS_LOGE("Display process app uninstall failed");
+        }
     }
     if (app_installed && !app->processUninstall()) {
         ESP_UTILS_LOGE("App uninstall failed");

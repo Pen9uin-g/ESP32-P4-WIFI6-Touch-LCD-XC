@@ -23,6 +23,29 @@ LV_IMG_DECLARE(img_app_drawpanel);
 
 namespace esp_brookesia::apps {
 
+static constexpr int DRAW_DOT_SIZE = 10;
+
+static void configureFixedDrawObject(lv_obj_t *obj, bool clickable)
+{
+    if (!obj) {
+        return;
+    }
+
+    lv_obj_clear_flag(
+        obj,
+        LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_SCROLL_ELASTIC | LV_OBJ_FLAG_SCROLL_MOMENTUM |
+        LV_OBJ_FLAG_SCROLL_ONE | LV_OBJ_FLAG_SCROLL_CHAIN | LV_OBJ_FLAG_SCROLL_ON_FOCUS |
+        LV_OBJ_FLAG_SCROLL_WITH_ARROW | LV_OBJ_FLAG_GESTURE_BUBBLE | LV_OBJ_FLAG_EVENT_BUBBLE
+    );
+    lv_obj_set_scrollbar_mode(obj, LV_SCROLLBAR_MODE_OFF);
+
+    if (clickable) {
+        lv_obj_add_flag(obj, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK);
+    } else {
+        lv_obj_clear_flag(obj, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_PRESS_LOCK);
+    }
+}
+
 Drawpanel *Drawpanel::_instance = nullptr;
 
 Drawpanel *Drawpanel::requestInstance(bool use_status_bar, bool use_navigation_bar)
@@ -34,38 +57,32 @@ Drawpanel *Drawpanel::requestInstance(bool use_status_bar, bool use_navigation_b
 }
 
 Drawpanel::Drawpanel(bool use_status_bar, bool use_navigation_bar) :
-    systems::phone::App(APP_NAME, &img_app_drawpanel, true, use_status_bar, use_navigation_bar),
+    App(APP_NAME, &img_app_drawpanel, true, use_status_bar, use_navigation_bar),
+    _panel_obj(nullptr),
     _max_points(1000)
 {
 }
 
 Drawpanel::~Drawpanel()
 {
-    clearAllPoints();
+    close();
 }
 
 bool Drawpanel::run(void)
 {
     ESP_UTILS_LOGD("Run");
-    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0xFFFFE0), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(lv_scr_act(), LV_OPA_COVER, LV_PART_MAIN);
 
-    lv_area_t area = getVisualArea();
-    int width = lv_area_get_width(&area);
-    int height = lv_area_get_height(&area);
+    lv_obj_t *screen = lv_scr_act();
+    lv_obj_set_style_bg_color(screen, lv_color_hex(0xFFFFE0), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
 
-    _panel_obj = lv_obj_create(lv_scr_act());
-    lv_obj_remove_style_all(_panel_obj);
-    lv_obj_set_size(_panel_obj, width, height);
-    lv_obj_set_pos(_panel_obj, area.x1, area.y1);
-    lv_obj_set_style_bg_opa(_panel_obj, LV_OPA_TRANSP, 0);
-    lv_obj_clear_flag(_panel_obj, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(_panel_obj, LV_OBJ_FLAG_CLICKABLE);
+    // The app screen already matches Brookesia's visual area. Using it directly
+    // prevents children near an edge from expanding a separate scrollable panel.
+    _panel_obj = screen;
+    configureFixedDrawObject(_panel_obj, true);
+    lv_obj_remove_event_cb_with_user_data(_panel_obj, touch_event_cb, this);
+    lv_obj_add_event_cb(_panel_obj, touch_event_cb, LV_EVENT_PRESSED, this);
     lv_obj_add_event_cb(_panel_obj, touch_event_cb, LV_EVENT_PRESSING, this);
-
-    lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
-    lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLL_CHAIN_VER);
 
     return true;
 }
@@ -83,8 +100,12 @@ bool Drawpanel::back(void)
 bool Drawpanel::close(void)
 {
     ESP_UTILS_LOGD("Close");
-    
+
     clearAllPoints();
+    if (_panel_obj) {
+        lv_obj_remove_event_cb_with_user_data(_panel_obj, touch_event_cb, this);
+        _panel_obj = nullptr;
+    }
 
     return true;
 }
@@ -120,7 +141,9 @@ bool Drawpanel::resume()
 void Drawpanel::clearAllPoints()
 {
     for (lv_obj_t* dot : _dots) {
-        lv_obj_del(dot);
+        if (dot) {
+            lv_obj_del(dot);
+        }
     }
     _dots.clear();
 }
@@ -128,12 +151,17 @@ void Drawpanel::clearAllPoints()
 void Drawpanel::touch_event_cb(lv_event_t *e)
 {
     Drawpanel *app = (Drawpanel *)lv_event_get_user_data(e);
-    if (!app) {
+    if (!app || !app->_panel_obj) {
         ESP_UTILS_LOGE("Get drawpanel instance failed");
         return;
     }
 
-    lv_indev_t *indev = lv_indev_get_act();
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code != LV_EVENT_PRESSED && code != LV_EVENT_PRESSING) {
+        return;
+    }
+
+    lv_indev_t *indev = lv_indev_active();
     if (!indev) {
         return;
     }
@@ -141,31 +169,39 @@ void Drawpanel::touch_event_cb(lv_event_t *e)
     lv_point_t point;
     lv_indev_get_point(indev, &point);
 
-    if (!app->_panel_obj) {
-        return;
-    }
-
     lv_area_t panel_area;
     lv_obj_get_coords(app->_panel_obj, &panel_area);
-    if (point.x < panel_area.x1 || point.x > panel_area.x2 || point.y < panel_area.y1 || point.y > panel_area.y2) {
+    if (point.x < panel_area.x1 || point.x > panel_area.x2 ||
+            point.y < panel_area.y1 || point.y > panel_area.y2) {
         return;
     }
 
-    int local_x = point.x - panel_area.x1;
-    int local_y = point.y - panel_area.y1;
-    
+    int dot_x = point.x - panel_area.x1 - DRAW_DOT_SIZE / 2;
+    int dot_y = point.y - panel_area.y1 - DRAW_DOT_SIZE / 2;
+    int max_x = lv_area_get_width(&panel_area) - DRAW_DOT_SIZE;
+    int max_y = lv_area_get_height(&panel_area) - DRAW_DOT_SIZE;
+    max_x = (max_x > 0) ? max_x : 0;
+    max_y = (max_y > 0) ? max_y : 0;
+    dot_x = (dot_x < 0) ? 0 : ((dot_x > max_x) ? max_x : dot_x);
+    dot_y = (dot_y < 0) ? 0 : ((dot_y > max_y) ? max_y : dot_y);
+
     lv_obj_t *dot = lv_obj_create(app->_panel_obj);
-    lv_obj_clear_flag(dot, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_size(dot, 10, 10);
-    lv_obj_set_pos(dot, local_x - 5, local_y - 5);
-    lv_obj_set_style_bg_color(dot, lv_color_make(255, 0, 0), 0);
-    lv_obj_set_style_radius(dot, 5, 0);
-    
+    configureFixedDrawObject(dot, false);
+    lv_obj_set_size(dot, DRAW_DOT_SIZE, DRAW_DOT_SIZE);
+    lv_obj_set_pos(dot, dot_x, dot_y);
+    lv_obj_set_style_bg_color(dot, lv_color_make(255, 0, 0), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_border_width(dot, 0, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(dot, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(dot, DRAW_DOT_SIZE / 2, LV_PART_MAIN);
+
     app->_dots.push_back(dot);
-    
+
     if (app->_dots.size() > app->_max_points) {
         lv_obj_t* oldest_dot = app->_dots.front();
-        lv_obj_del(oldest_dot);
+        if (oldest_dot) {
+            lv_obj_del(oldest_dot);
+        }
         app->_dots.pop_front();
     }
 }

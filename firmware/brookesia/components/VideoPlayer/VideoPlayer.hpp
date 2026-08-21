@@ -4,6 +4,7 @@
 #include "bsp/esp-bsp.h"
 #include "bsp/display.h"
 #include "bsp_board_extra.h"
+#include "esp_lcd_mipi_dsi.h"
 #include "driver/ppa.h"
 #include "esp_lcd_touch.h"
 #include "esp_lcd_types.h"
@@ -53,6 +54,7 @@ namespace esp_brookesia::apps
         bool is_playing = false;
         bool is_paused = false;
         bool sd_mounted = false;
+        bool audio_ready = false;
         bool dummy_enabled = false;
         bool lvgl_paused = false;
         bool touch_active = false;
@@ -70,6 +72,8 @@ namespace esp_brookesia::apps
 
         lv_obj_t *status_label = nullptr;
 
+        bool startPlaybackTask();
+        bool stopPlaybackTask(TickType_t timeout);
         esp_err_t getAviFileList(const char *dir_path);
         esp_err_t initDisplayBypass();
         void deinitDisplayBypass();
