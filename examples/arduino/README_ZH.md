@@ -12,7 +12,7 @@
 
 ### CI 测试配置
 
-GitHub Actions 使用 Arduino-ESP32 `3.3.11` 编译 5 个一方示例。CI 使用以下
+GitHub Actions 使用 Arduino-ESP32 `3.3.11` 编译 10 个一方示例。CI 使用以下
 开发板配置：
 
 ```text
@@ -23,6 +23,49 @@ esp32:esp32:esp32p4:ChipVariant=postv3,PSRAM=enabled,FlashSize=32M,FlashMode=qio
 并为图形示例提供 13 MB 应用分区。对于已确认的 pre-v3 芯片，应显式把
 `ChipVariant=postv3` 替换为 `ChipVariant=prev3`；该构建不属于默认 CI 矩阵，
 其二进制文件也不能与 `rev3_x` 构建互换。
+
+### Arduino IDE 配置
+
+安装精确版本为 `3.3.11` 的 **ESP32 by Espressif Systems** 开发板包，然后将本仓库
+`examples/arduino/libraries/` 目录下的四个直接内容复制到 Arduino sketchbook 的
+`libraries/` 目录：
+
+| 仓库内容 | sketchbook 目标位置 |
+| --- | --- |
+| `displays/` | `libraries/displays/` |
+| `GFX_Library_for_Arduino/` | `libraries/GFX_Library_for_Arduino/` |
+| `lvgl/` | `libraries/lvgl/` |
+| `lv_conf.h` | `libraries/lv_conf.h` |
+
+请复制仓库 `libraries/` 目录中的**内容**，不要复制其父目录本身；尤其不能形成
+`libraries/libraries/`。上列四项即为这些示例完整的随仓库依赖集，请勿以不相关的
+上游库替换。
+
+`ESP_Video`、`SD_MMC`、`FS`、`Wire` 和 `I2S` 由安装的 Arduino-ESP32 3.3.11 core
+提供，无需从本仓库复制。
+
+`displays_config.h` 默认选择 3.4C 面板：`CURRENT_SCREEN` 为
+`SCREEN_3INCH_4_DSI`。在 Arduino IDE 中构建 4C 时，请将
+`libraries/displays/displays_config.h` 中的默认值改为 `SCREEN_4INCH_DSI`。CI
+通过等效的 `CURRENT_SCREEN` 构建宏编译两种面板。
+
+Arduino-ESP32 3.3.11 的 **工具 (Tools)** 菜单请使用下列对应选项：
+
+| 工具菜单 | 选择项 |
+| --- | --- |
+| Board | `ESP32P4 Dev Module` |
+| Chip Variant | `v3.00 or newer` |
+| PSRAM | `Enabled` |
+| Flash Size | `32MB (256Mb)` |
+| Flash Mode | `QIO` |
+| Flash Frequency | `80MHz` |
+| Partition Scheme | `32M Flash (13MB APP/6.75MB SPIFFS)` |
+| USB Mode | `Hardware CDC and JTAG` |
+| CDC On Boot | `Enabled` |
+| Upload Speed | `921600` |
+| Upload Mode | `UART0 / Hardware CDC`（默认；UART0 上传使用 USB-UART bridge） |
+
+以上为前述 CI FQBN 在 Arduino IDE 中对应的菜单名称。
 
 ### USB 接口与非阻塞日志
 
@@ -40,6 +83,32 @@ CI FQBN 选择 `USBMode=hwcdc,CDCOnBoot=cdc`，因此示例的 `Serial` 日志�
 | --- | --- |
 | ESP32-P4-WIFI6-Touch-LCD-3.4C | `CURRENT_SCREEN=SCREEN_3INCH_4_DSI` |
 | ESP32-P4-WIFI6-Touch-LCD-4C | `CURRENT_SCREEN=SCREEN_4INCH_DSI` |
+
+### 一方示例
+
+Arduino 示例采用编号目录，使文档、CI 自动发现和 Arduino IDE 的 sketch 名称保持一致：
+
+| 示例 | 功能 |
+| --- | --- |
+| `01_HelloWorld` | DSI 显示屏基础初始化和文本输出 |
+| `02_AsciiTable` | 显示字符表 |
+| `03_Drawing_board` | 基于 GT911 兼容轮询接口的触控画板 |
+| `04_LVGLV9_Arduino` | LVGL v9 显示和触控示例 |
+| `05_GFX_ESPWiFiAnalyzer` | 附近 Wi-Fi 扫描可视化 |
+| `06_Camera_Preview` | 在所选 XC 显示屏上预览 OV5647 MIPI-CSI 相机 |
+| `07_Camera_ISP_Tuning` | 带串口 ISP/3A 控制的 OV5647 预览 |
+| `08_SD_Card` | SDIO microSD 读写检查 |
+| `09_Audio_Playback` | ES8311 扬声器播放 |
+| `10_Mic_Record` | ES7210 麦克风 PCM 采集 |
+
+相机、存储卡和音频示例使用 XC 开发板的外设引脚。即使未连接相机、存储卡或
+音频硬件，示例仍可编译；运行相应功能时则需要连接对应硬件。
+
+### MIPI-DSI 时钟源
+
+随仓库提供的 Arduino_GFX DSI panel 将 `phy_clk_src` 保持为 `0`，与已发布 BSP
+一致，并由 ESP-IDF 的芯片修订 profile 自动选择正确的 PHY 时钟源。默认 CI 配置
+使用 `ChipVariant=postv3`；不要将 pre-v3 构建烧录到 rev3.x 开发板，反之亦然。
 
 ### 触控行为
 
