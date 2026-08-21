@@ -50,6 +50,9 @@ EXPECTED_SCREEN_DEFINES = {
     "3_4c": "CURRENT_SCREEN=SCREEN_3INCH_4_DSI",
     "4c": "CURRENT_SCREEN=SCREEN_4INCH_DSI",
 }
+CUSTOM_PROPERTY_SCREEN_DEFINE_RE = re.compile(
+    r"(?:^|[\s=])-D(CURRENT_SCREEN=[A-Za-z0-9_]+)(?=$|\s)"
+)
 FORBIDDEN_FLASH_TOKEN_RE = re.compile(
     r"(?i)(?:^|[^a-z0-9])(?:erase(?:[_-](?:flash|region))?|esp32c6)(?:$|[^a-z0-9])"
 )
@@ -194,6 +197,11 @@ def parse_build_options(
     ):
         raise PackageError(f"generated Arduino build did not use Arduino-ESP32 {ARDUINO_CORE_VERSION}")
     return data
+
+
+def parse_custom_property_screen_defines(value: str) -> list[str]:
+    """Return complete screen defines from Arduino custom build properties."""
+    return CUSTOM_PROPERTY_SCREEN_DEFINE_RE.findall(value)
 
 
 def safe_relative(value: str) -> PurePosixPath:
@@ -483,9 +491,7 @@ def arduino_build_identity(
     custom_properties = build_options.get("customBuildProperties")
     if not isinstance(custom_properties, str):
         raise PackageError("generated Arduino build options lack customBuildProperties")
-    property_screen_defines = re.findall(
-        r"(?<!\S)-D(CURRENT_SCREEN=[A-Za-z0-9_]+)(?!\S)", custom_properties
-    )
+    property_screen_defines = parse_custom_property_screen_defines(custom_properties)
     if property_screen_defines != [expected_screen_define]:
         raise PackageError("generated Arduino build options screen identity is inconsistent")
     compile_identity = parse_compile_identity(

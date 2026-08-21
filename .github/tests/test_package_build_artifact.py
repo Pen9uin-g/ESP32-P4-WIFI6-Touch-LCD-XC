@@ -50,6 +50,38 @@ class ArtifactPackagingTests(unittest.TestCase):
         with self.assertRaises(PACKAGE_MODULE.PackageError):
             PACKAGE_MODULE.parse_fqbn_selections(LEGACY_FQBN, "rev3_x")
 
+    def test_custom_build_property_screen_defines_accept_assignment_form(self) -> None:
+        self.assertEqual(
+            ["CURRENT_SCREEN=SCREEN_3INCH_4_DSI"],
+            PACKAGE_MODULE.parse_custom_property_screen_defines(
+                "compiler.cpp.extra_flags=-DCURRENT_SCREEN=SCREEN_3INCH_4_DSI"
+            ),
+        )
+        self.assertEqual(
+            ["CURRENT_SCREEN=SCREEN_4INCH_DSI"],
+            PACKAGE_MODULE.parse_custom_property_screen_defines(
+                "compiler.cpp.extra_flags=-DCURRENT_SCREEN=SCREEN_4INCH_DSI"
+            ),
+        )
+
+    def test_custom_build_property_screen_defines_preserve_invalid_and_conflicting_inputs(self) -> None:
+        self.assertEqual(
+            [],
+            PACKAGE_MODULE.parse_custom_property_screen_defines(
+                "compiler.cpp.extra_flags=-DCURRENT_SCREEN=SCREEN_3INCH_4_DSI;bad"
+            ),
+        )
+        self.assertEqual(
+            [
+                "CURRENT_SCREEN=SCREEN_3INCH_4_DSI",
+                "CURRENT_SCREEN=SCREEN_4INCH_DSI",
+            ],
+            PACKAGE_MODULE.parse_custom_property_screen_defines(
+                "compiler.cpp.extra_flags=-DCURRENT_SCREEN=SCREEN_3INCH_4_DSI "
+                "-DCURRENT_SCREEN=SCREEN_4INCH_DSI"
+            ),
+        )
+
     @classmethod
     def create_source_repository(cls, root: Path, marker: str) -> str:
         for project, sketch in (("examples/test", "test"), ("examples/other", "other")):
@@ -216,6 +248,7 @@ class ArtifactPackagingTests(unittest.TestCase):
         compile_usb_mode: str = "1",
         compile_cdc_on_boot: str = "1",
         compile_source_project: str | None = None,
+        custom_build_properties: str | None = None,
         source_root: Path | None = None,
         product_sha: str | None = None,
         package_script: Path | None = None,
@@ -250,7 +283,7 @@ class ArtifactPackagingTests(unittest.TestCase):
                 {
                     "fqbn": build_fqbn if build_fqbn is not None else fqbn,
                     "hardwareFolders": "/opt/arduino/packages/esp32/hardware/esp32/3.3.11",
-                    "customBuildProperties": (
+                    "customBuildProperties": custom_build_properties or (
                         "compiler.cpp.extra_flags=-I/home/ubuntu/private "
                         "-I/tmp/tool-cache -DCURRENT_SCREEN=SCREEN_3INCH_4_DSI"
                     ),
@@ -734,6 +767,41 @@ class ArtifactPackagingTests(unittest.TestCase):
                     else "compile FQBN/USB identity"
                 )
                 self.assertIn(expected, result.stderr)
+
+    def test_package_build_options_accepts_assignment_and_rejects_invalid_or_conflicting_screen_defines(self) -> None:
+        cases = (
+            {
+                "label": "assignment",
+                "properties": "compiler.cpp.extra_flags=-DCURRENT_SCREEN=SCREEN_3INCH_4_DSI",
+                "returncode": 0,
+            },
+            {
+                "label": "invalid",
+                "properties": "compiler.cpp.extra_flags=-DCURRENT_SCREEN=SCREEN_3INCH_4_DSI;bad",
+                "returncode": 2,
+            },
+            {
+                "label": "conflicting",
+                "properties": (
+                    "compiler.cpp.extra_flags=-DCURRENT_SCREEN=SCREEN_3INCH_4_DSI "
+                    "-DCURRENT_SCREEN=SCREEN_4INCH_DSI"
+                ),
+                "returncode": 2,
+            },
+        )
+        for case in cases:
+            with self.subTest(label=case["label"]), tempfile.TemporaryDirectory() as temporary:
+                build, output = Path(temporary) / "build", Path(temporary) / "out"
+                self.make_arduino_build(build)
+                result = self.run_package(
+                    "arduino",
+                    build,
+                    output,
+                    custom_build_properties=case["properties"],
+                )
+                self.assertEqual(case["returncode"], result.returncode, result.stderr)
+                if case["returncode"]:
+                    self.assertIn("build options screen identity", result.stderr)
 
     def test_validator_rejects_manifest_project_and_sketch_spoofing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
