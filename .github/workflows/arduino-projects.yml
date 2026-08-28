@@ -1,4 +1,4 @@
-name: ESP-IDF projects - ESP32-P4 Rev1.x
+name: Arduino projects - ESP32-P4 Rev1.x
 
 on:
   pull_request:
@@ -7,8 +7,8 @@ on:
       - main
   workflow_dispatch:
     inputs:
-      project:
-        description: "ESP-IDF project directory name, path, or all"
+      sketch:
+        description: "Arduino sketch directory name, path, or all"
         required: false
         default: "all"
 
@@ -16,29 +16,27 @@ permissions:
   contents: read
 
 concurrency:
-  group: esp-idf-projects-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: arduino-projects-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  ARDUINO_CORE_VERSION: "3.3.11"
+  ESP32_INDEX_URL: "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
+  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600"
+  BSP_REFERENCE_VERSION: "3.0.1"
+  BSP_REFERENCE_SOURCE_SHA: "bfeb6e6d5737178cdde78b630c8118074da0a657"
+  BSP_REFERENCE_SOURCE_TREE: "7c12c7115599b4bb84072ad9ea68cc8c3e81b9c6"
+  BSP_REFERENCE_COMPONENT_TREE: "eff6286f5bb97145fb43a33102b9dafdfa5f5c0b"
+  BSP_REFERENCE_RELATIONSHIP: "reference-only"
+
 jobs:
-  self-check:
-    name: Repository self-check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout exact source revision
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-
-      - name: Run repository self-check
-        run: python .github/scripts/repo_self_check.py
-
   discover:
-    name: Route ESP-IDF changes
+    name: Route Arduino changes
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.route.outputs.idf_matrix }}
-      has_projects: ${{ steps.route.outputs.has_idf }}
-      projects: ${{ steps.route.outputs.idf_projects }}
+      matrix: ${{ steps.route.outputs.arduino_matrix }}
+      has_sketches: ${{ steps.route.outputs.has_arduino }}
+      sketches: ${{ steps.route.outputs.arduino_sketches }}
       firmware_touched: ${{ steps.route.outputs.firmware_touched }}
       release_review: ${{ steps.route.outputs.release_review }}
     steps:
@@ -52,13 +50,11 @@ jobs:
         id: route
         shell: bash
         env:
-          MANUAL_PROJECT: ${{ inputs.project }}
+          MANUAL_SKETCH: ${{ inputs.sketch }}
         run: |
           set -euo pipefail
-
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            python .github/scripts/ci_change_router.py \
-              --manual-idf "$MANUAL_PROJECT"
+            python .github/scripts/ci_change_router.py --manual-arduino "$MANUAL_SKETCH"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             python .github/scripts/ci_change_router.py \
               --base-ref "${{ github.event.pull_request.base.sha }}" \
@@ -69,42 +65,31 @@ jobs:
               python .github/scripts/ci_change_router.py --all
             else
               python .github/scripts/ci_change_router.py \
-                --base-ref "$before" \
-                --head-ref "${{ github.sha }}"
+                --base-ref "$before" --head-ref "${{ github.sha }}"
             fi
           fi
 
       - name: Summary
         shell: bash
         env:
-          SELECTED_PROJECTS: ${{ steps.route.outputs.idf_projects }}
+          SELECTED_SKETCHES: ${{ steps.route.outputs.arduino_sketches }}
         run: |
-          if [[ "${{ steps.route.outputs.has_idf }}" == "true" ]]; then
+          if [[ "${{ steps.route.outputs.has_arduino }}" == "true" ]]; then
             {
-              echo "### ESP-IDF Rev1.x projects selected"
+              echo "### Arduino Rev1.x sketches selected"
               echo
-              printf '%s\n' "$SELECTED_PROJECTS" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
+              printf '%s\n' "$SELECTED_SKETCHES" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
               echo
-              echo "Each selected project builds with ESP-IDF v5.5.5 and v6.0.2."
-              echo "All builds use a generated sdkconfig.ci.rev1_3 compatibility overlay."
-              echo "Display projects build both 3.4C and 4C variants; USB also builds default and vendor-only configurations."
+              echo "Each sketch is compiled for the 3.4C and 4C displays with ChipVariant=prev3."
             } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "No ESP-IDF example build was selected." >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [[ "${{ steps.route.outputs.firmware_touched }}" == "true" ]]; then
-            echo "Maintained firmware changed; it remains outside the example matrix." >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [[ "${{ steps.route.outputs.release_review }}" == "true" ]]; then
-            echo "Binary or archive changes require explicit release review." >> "$GITHUB_STEP_SUMMARY"
+            echo "No Arduino sketch build was selected." >> "$GITHUB_STEP_SUMMARY"
           fi
 
   build:
-    name: Build ${{ matrix.project_name }} / Rev1.3 / ${{ matrix.variant }} / ${{ matrix.configuration }} (${{ matrix.idf_version }})
-    needs:
-      - self-check
-      - discover
-    if: needs.discover.outputs.has_projects == 'true'
+    name: Build ${{ matrix.sketch_name }} / Rev1.3 (${{ matrix.screen }})
+    needs: discover
+    if: needs.discover.outputs.has_sketches == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -115,84 +100,118 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Prepare ESP32-P4 Rev1.x build command
-        id: rev1-command
+      - name: Set up Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Install Arduino-ESP32
         shell: bash
-        env:
-          ORIGINAL_COMMAND: ${{ matrix.command }}
-          PROJECT_PATH: ${{ matrix.project }}
         run: |
           set -euo pipefail
+          arduino-cli core update-index --additional-urls "$ESP32_INDEX_URL"
+          arduino-cli core install "esp32:esp32@$ARDUINO_CORE_VERSION" \
+            --additional-urls "$ESP32_INDEX_URL"
 
-          # This repository has no shared config/ci directory. Create the
-          # Rev1.x compatibility overlay inside the selected project because
-          # esp-idf-ci-action executes the command from that directory.
-          rev1_defaults="sdkconfig.ci.rev1_3"
-          overlay_path="$PROJECT_PATH/$rev1_defaults"
-          printf '%s\n' \
-            'CONFIG_ESP32P4_REV_MIN_100=y' \
-            '# CONFIG_ESP32P4_REV_MIN_300 is not set' \
-            '# CONFIG_ESP32P4_REV_MIN_1 is not set' \
-            'CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y' \
-            'CONFIG_SPIRAM_SPEED_200M=y' \
-            '# CONFIG_SPIRAM_SPEED_250M is not set' \
-            > "$overlay_path"
-          test -s "$overlay_path"
+      - name: Verify ESP32-P4 Rev1.x profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$ARDUINO_FQBN" == *"ChipVariant=prev3"* ]]
+          [[ "$ARDUINO_FQBN" != *"ChipVariant=postv3"* ]]
+          echo "Verified Rev1.x FQBN: $ARDUINO_FQBN"
 
-          if [[ "$ORIGINAL_COMMAND" == *"SDKCONFIG_DEFAULTS="* ]]; then
-            # Append the silicon overlay last so project defaults cannot
-            # override the Rev1.x revision and PSRAM selections.
-            command_text="${ORIGINAL_COMMAND/\" build/;${rev1_defaults}\" build}"
-          elif [[ "$ORIGINAL_COMMAND" == "idf.py build" ]]; then
-            command_text="idf.py -D \"SDKCONFIG_DEFAULTS=sdkconfig.defaults;${rev1_defaults}\" build"
-          else
-            echo "ERROR: Unsupported matrix command: $ORIGINAL_COMMAND"
-            exit 1
-          fi
-
-          if [[ "$command_text" != *"$rev1_defaults"* ]]; then
-            echo "ERROR: Rev1.x overlay was not added to the build command."
-            echo "Build command: $command_text"
-            exit 1
-          fi
-          [[ "$command_text" != *"rev3_x.defaults"* ]]
-          echo "Rev1.x build command: $command_text"
-
-          {
-            echo 'command<<EOF'
-            echo "$command_text"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Build with ESP-IDF Rev1.x profile
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: ${{ matrix.idf_version }}
-          target: esp32p4
-          path: ${{ matrix.project }}
-          command: ${{ steps.rev1-command.outputs.command }}
-
-      - name: Package flashable Rev1.x example artifact
-        id: package
+      - name: Compile sketch
         shell: bash
         env:
-          ARTIFACT_KEY: ${{ matrix.artifact_key }}-rev1_3
+          SKETCH_NAME: ${{ matrix.sketch_name }}
+          SKETCH_PATH: ${{ matrix.sketch }}
+          SCREEN_NAME: ${{ matrix.screen }}
+          SCREEN_DEFINE: ${{ matrix.screen_define }}
+        run: |
+          set -euo pipefail
+          library_root="$GITHUB_WORKSPACE/examples/arduino/libraries"
+          build_path="$RUNNER_TEMP/arduino-build/$SKETCH_NAME/$SCREEN_NAME"
+          arduino-cli compile \
+            --fqbn "$ARDUINO_FQBN" \
+            --warnings all \
+            --libraries "$library_root" \
+            --build-path "$build_path" \
+            --build-property "compiler.cpp.extra_flags=-DCURRENT_SCREEN=$SCREEN_DEFINE" \
+            "$SKETCH_PATH"
+          test -f "$build_path/flash_args"
+          test -f "$build_path/build.options.json"
+
+      - name: Package flashable Rev1.x artifact
+        id: package
+        shell: bash
         run: |
           set -euo pipefail
           git_sha="$(git rev-parse HEAD)"
-          output="$RUNNER_TEMP/example-artifacts/$ARTIFACT_KEY"
-          python .github/scripts/package_build_artifact.py esp-idf \
-            --build-dir "${{ matrix.project }}/build" --output-dir "$output" \
-            --product-label "ESP32-P4-WIFI6-Touch-LCD-XC" --variant "${{ matrix.variant }}" \
-            --variant-id "${{ matrix.variant_id }}" \
-            --resolution "${{ matrix.resolution }}" --configuration "${{ matrix.configuration }}" \
-            --framework-version "${{ matrix.idf_version }}" --target esp32p4 \
-            --project "${{ matrix.project }}" --profile-id "rev1_3" \
-            --sdkconfig "${{ matrix.project }}/sdkconfig" --git-sha "$git_sha"
-          echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
-          echo "path=$output" >> "$GITHUB_OUTPUT"
+          build_path="$RUNNER_TEMP/arduino-build/${{ matrix.sketch_name }}/${{ matrix.screen }}"
+          artifact_name="ESP32-P4-WIFI6-Touch-LCD-XC-${{ matrix.variant_id }}-${{ matrix.sketch_name }}-arduino-${ARDUINO_CORE_VERSION}-rev1_3"
+          package_dir="$RUNNER_TEMP/example-artifacts/$artifact_name"
+          zip_output="$RUNNER_TEMP/example-artifacts/${artifact_name}.zip"
 
-      - name: Upload flashable Rev1.x example artifact
+          test -f "$build_path/flash_args"
+          test -f "$build_path/build.options.json"
+          mkdir -p "$package_dir"
+          cp -a "$build_path"/. "$package_dir"/
+
+          # Arduino may record runner-absolute BIN paths. Make the package
+          # portable by retaining only each image basename.
+          sed -E 's#([^[:space:]]*/)([^/[:space:]]+\.bin)#\2#g' \
+            "$build_path/flash_args" > "$package_dir/flash_args"
+          cp "$package_dir/flash_args" "$package_dir/flash_args.txt"
+          for image in $(tr ' ' '\n' < "$package_dir/flash_args" | sed -n '/\.bin$/p'); do
+            test -f "$package_dir/$image"
+          done
+
+          printf '%s\n' \
+            '@echo off' \
+            'setlocal EnableExtensions EnableDelayedExpansion' \
+            'cd /d "%~dp0"' \
+            'if "%~1"=="" (' \
+            '  echo Usage: flash.bat COMx' \
+            '  exit /b 2' \
+            ')' \
+            'set "FLASH_ARGS="' \
+            'for /f "usebackq delims=" %%A in ("flash_args") do set "FLASH_ARGS=!FLASH_ARGS! %%A"' \
+            'python -m esptool --chip esp32p4 --port "%~1" --baud 921600 write_flash !FLASH_ARGS!' \
+            'exit /b %ERRORLEVEL%' \
+            > "$package_dir/flash.bat"
+
+          printf '%s\n' \
+            '#!/usr/bin/env sh' \
+            'set -eu' \
+            'if [ "$#" -ne 1 ]; then echo "Usage: ./flash.sh PORT"; exit 2; fi' \
+            'cd "$(dirname "$0")"' \
+            'python -m esptool --chip esp32p4 --port "$1" --baud 921600 write_flash $(cat flash_args)' \
+            > "$package_dir/flash.sh"
+          chmod +x "$package_dir/flash.sh"
+
+          printf '%s\n' \
+            "# $artifact_name" \
+            '' \
+            'Target: ESP32-P4 silicon revision before v3.00 (Rev1.x)' \
+            "Display variant: ${{ matrix.variant }}" \
+            "Resolution: ${{ matrix.resolution }}" \
+            "Arduino-ESP32: $ARDUINO_CORE_VERSION" \
+            "FQBN: $ARDUINO_FQBN" \
+            "Git commit: $git_sha" \
+            '' \
+            'Install esptool: python -m pip install esptool' \
+            'Windows: flash.bat COM21' \
+            'Linux/macOS: ./flash.sh PORT' \
+            > "$package_dir/README.md"
+
+          test -n "$(find "$package_dir" -maxdepth 1 -type f -name '*.bin' -print -quit)"
+          cd "$RUNNER_TEMP/example-artifacts"
+          zip -qr "$zip_output" "$artifact_name"
+          test -s "$zip_output"
+
+          echo "name=${artifact_name}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
+          echo "path=$zip_output" >> "$GITHUB_OUTPUT"
+
+      - name: Upload flashable Rev1.x artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.package.outputs.name }}
