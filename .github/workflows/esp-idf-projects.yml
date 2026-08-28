@@ -140,7 +140,9 @@ jobs:
           test -s "$overlay_path"
 
           if [[ "$ORIGINAL_COMMAND" == *"SDKCONFIG_DEFAULTS="* ]]; then
-            command_text="${ORIGINAL_COMMAND/SDKCONFIG_DEFAULTS=/SDKCONFIG_DEFAULTS=${rev1_defaults};}"
+            # Append the silicon overlay last so project defaults cannot
+            # override the Rev1.x revision and PSRAM selections.
+            command_text="${ORIGINAL_COMMAND/\" build/;${rev1_defaults}\" build}"
           elif [[ "$ORIGINAL_COMMAND" == "idf.py build" ]]; then
             command_text="idf.py -D \"SDKCONFIG_DEFAULTS=sdkconfig.defaults;${rev1_defaults}\" build"
           else
@@ -148,7 +150,11 @@ jobs:
             exit 1
           fi
 
-          [[ "$command_text" == *"rev1_3.defaults"* ]]
+          if [[ "$command_text" != *"$rev1_defaults"* ]]; then
+            echo "ERROR: Rev1.x overlay was not added to the build command."
+            echo "Build command: $command_text"
+            exit 1
+          fi
           [[ "$command_text" != *"rev3_x.defaults"* ]]
           echo "Rev1.x build command: $command_text"
 
