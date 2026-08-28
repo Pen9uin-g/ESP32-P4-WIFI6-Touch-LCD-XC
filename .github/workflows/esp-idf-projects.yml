@@ -86,7 +86,7 @@ jobs:
               printf '%s\n' "$SELECTED_PROJECTS" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
               echo
               echo "Each selected project builds with ESP-IDF v5.5.5 and v6.0.2."
-              echo "All builds are forced to config/ci/rev1_3.defaults."
+              echo "All builds use a generated sdkconfig.ci.rev1_3 compatibility overlay."
               echo "Display projects build both 3.4C and 4C variants; USB also builds default and vendor-only configurations."
             } >> "$GITHUB_STEP_SUMMARY"
           else
@@ -120,12 +120,25 @@ jobs:
         shell: bash
         env:
           ORIGINAL_COMMAND: ${{ matrix.command }}
+          PROJECT_PATH: ${{ matrix.project }}
         run: |
           set -euo pipefail
-          test -f config/ci/rev1_3.defaults
 
-          # The action runs the command from examples/esp-idf/<project>.
-          rev1_defaults="../../../config/ci/rev1_3.defaults"
+          # This repository has no shared config/ci directory. Create the
+          # Rev1.x compatibility overlay inside the selected project because
+          # esp-idf-ci-action executes the command from that directory.
+          rev1_defaults="sdkconfig.ci.rev1_3"
+          overlay_path="$PROJECT_PATH/$rev1_defaults"
+          printf '%s\n' \
+            'CONFIG_ESP32P4_REV_MIN_100=y' \
+            '# CONFIG_ESP32P4_REV_MIN_300 is not set' \
+            '# CONFIG_ESP32P4_REV_MIN_1 is not set' \
+            'CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y' \
+            'CONFIG_SPIRAM_SPEED_200M=y' \
+            '# CONFIG_SPIRAM_SPEED_250M is not set' \
+            > "$overlay_path"
+          test -s "$overlay_path"
+
           if [[ "$ORIGINAL_COMMAND" == *"SDKCONFIG_DEFAULTS="* ]]; then
             command_text="${ORIGINAL_COMMAND/SDKCONFIG_DEFAULTS=/SDKCONFIG_DEFAULTS=${rev1_defaults};}"
           elif [[ "$ORIGINAL_COMMAND" == "idf.py build" ]]; then
