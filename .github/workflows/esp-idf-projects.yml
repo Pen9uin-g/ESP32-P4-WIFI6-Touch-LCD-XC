@@ -1,4 +1,4 @@
-name: ESP-IDF projects
+name: ESP-IDF projects - ESP32-P4 Rev1.x
 
 on:
   pull_request:
@@ -81,11 +81,12 @@ jobs:
         run: |
           if [[ "${{ steps.route.outputs.has_idf }}" == "true" ]]; then
             {
-              echo "### ESP-IDF projects selected"
+              echo "### ESP-IDF Rev1.x projects selected"
               echo
               printf '%s\n' "$SELECTED_PROJECTS" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
               echo
               echo "Each selected project builds with ESP-IDF v5.5.5 and v6.0.2."
+              echo "All builds are forced to config/ci/rev1_3.defaults."
               echo "Display projects build both 3.4C and 4C variants; USB also builds default and vendor-only configurations."
             } >> "$GITHUB_STEP_SUMMARY"
           else
@@ -99,7 +100,7 @@ jobs:
           fi
 
   build:
-    name: Build ${{ matrix.project_name }} / ${{ matrix.profile_id }} / ${{ matrix.variant }} / ${{ matrix.configuration }} (${{ matrix.idf_version }})
+    name: Build ${{ matrix.project_name }} / Rev1.3 / ${{ matrix.variant }} / ${{ matrix.configuration }} (${{ matrix.idf_version }})
     needs:
       - self-check
       - discover
@@ -114,19 +115,45 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Build with ESP-IDF
+      - name: Prepare ESP32-P4 Rev1.x build command
+        id: rev1-command
+        shell: bash
+        env:
+          ORIGINAL_COMMAND: ${{ matrix.command }}
+        run: |
+          set -euo pipefail
+          test -f config/ci/rev1_3.defaults
+
+          command_text="${ORIGINAL_COMMAND//rev3_x.defaults/rev1_3.defaults}"
+          if [[ "$command_text" != *"rev1_3.defaults"* ]]; then
+            echo "ERROR: The generated build command does not select config/ci/rev1_3.defaults."
+            echo "Original command: $ORIGINAL_COMMAND"
+            exit 1
+          fi
+          if [[ "$command_text" == *"rev3_x.defaults"* ]]; then
+            echo "ERROR: Rev3 defaults remain in the build command."
+            exit 1
+          fi
+
+          {
+            echo 'command<<EOF'
+            echo "$command_text"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build with ESP-IDF Rev1.x profile
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: ${{ matrix.idf_version }}
           target: esp32p4
           path: ${{ matrix.project }}
-          command: ${{ matrix.command }}
+          command: ${{ steps.rev1-command.outputs.command }}
 
-      - name: Package flashable example artifact
+      - name: Package flashable Rev1.x example artifact
         id: package
         shell: bash
         env:
-          ARTIFACT_KEY: ${{ matrix.artifact_key }}
+          ARTIFACT_KEY: ${{ matrix.artifact_key }}-rev1_3
         run: |
           set -euo pipefail
           git_sha="$(git rev-parse HEAD)"
@@ -137,12 +164,12 @@ jobs:
             --variant-id "${{ matrix.variant_id }}" \
             --resolution "${{ matrix.resolution }}" --configuration "${{ matrix.configuration }}" \
             --framework-version "${{ matrix.idf_version }}" --target esp32p4 \
-            --project "${{ matrix.project }}" --profile-id "${{ matrix.profile_id }}" \
+            --project "${{ matrix.project }}" --profile-id "rev1_3" \
             --sdkconfig "${{ matrix.project }}/sdkconfig" --git-sha "$git_sha"
           echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
           echo "path=$output" >> "$GITHUB_OUTPUT"
 
-      - name: Upload flashable example artifact
+      - name: Upload flashable Rev1.x example artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.package.outputs.name }}
