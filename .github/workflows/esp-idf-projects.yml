@@ -124,16 +124,20 @@ jobs:
           set -euo pipefail
           test -f config/ci/rev1_3.defaults
 
-          command_text="${ORIGINAL_COMMAND//rev3_x.defaults/rev1_3.defaults}"
-          if [[ "$command_text" != *"rev1_3.defaults"* ]]; then
-            echo "ERROR: The generated build command does not select config/ci/rev1_3.defaults."
-            echo "Original command: $ORIGINAL_COMMAND"
+          # The action runs the command from examples/esp-idf/<project>.
+          rev1_defaults="../../../config/ci/rev1_3.defaults"
+          if [[ "$ORIGINAL_COMMAND" == *"SDKCONFIG_DEFAULTS="* ]]; then
+            command_text="${ORIGINAL_COMMAND/SDKCONFIG_DEFAULTS=/SDKCONFIG_DEFAULTS=${rev1_defaults};}"
+          elif [[ "$ORIGINAL_COMMAND" == "idf.py build" ]]; then
+            command_text="idf.py -D \"SDKCONFIG_DEFAULTS=sdkconfig.defaults;${rev1_defaults}\" build"
+          else
+            echo "ERROR: Unsupported matrix command: $ORIGINAL_COMMAND"
             exit 1
           fi
-          if [[ "$command_text" == *"rev3_x.defaults"* ]]; then
-            echo "ERROR: Rev3 defaults remain in the build command."
-            exit 1
-          fi
+
+          [[ "$command_text" == *"rev1_3.defaults"* ]]
+          [[ "$command_text" != *"rev3_x.defaults"* ]]
+          echo "Rev1.x build command: $command_text"
 
           {
             echo 'command<<EOF'
