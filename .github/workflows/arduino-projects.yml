@@ -1,4 +1,4 @@
-name: Arduino projects
+name: Arduino projects - ESP32-P4 Rev1.x
 
 on:
   pull_request:
@@ -22,7 +22,7 @@ concurrency:
 env:
   ARDUINO_CORE_VERSION: "3.3.11"
   ESP32_INDEX_URL: "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
-  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=postv3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600"
+  ARDUINO_FQBN: "esp32:esp32:esp32p4:ChipVariant=prev3,PSRAM=enabled,FlashSize=32M,FlashMode=qio,FlashFreq=80,PartitionScheme=app13M_data7M_32MB,USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,UploadSpeed=921600"
   BSP_REFERENCE_VERSION: "3.0.1"
   BSP_REFERENCE_SOURCE_SHA: "bfeb6e6d5737178cdde78b630c8118074da0a657"
   BSP_REFERENCE_SOURCE_TREE: "7c12c7115599b4bb84072ad9ea68cc8c3e81b9c6"
@@ -53,10 +53,8 @@ jobs:
           MANUAL_SKETCH: ${{ inputs.sketch }}
         run: |
           set -euo pipefail
-
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            python .github/scripts/ci_change_router.py \
-              --manual-arduino "$MANUAL_SKETCH"
+            python .github/scripts/ci_change_router.py --manual-arduino "$MANUAL_SKETCH"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             python .github/scripts/ci_change_router.py \
               --base-ref "${{ github.event.pull_request.base.sha }}" \
@@ -67,8 +65,7 @@ jobs:
               python .github/scripts/ci_change_router.py --all
             else
               python .github/scripts/ci_change_router.py \
-                --base-ref "$before" \
-                --head-ref "${{ github.sha }}"
+                --base-ref "$before" --head-ref "${{ github.sha }}"
             fi
           fi
 
@@ -79,24 +76,18 @@ jobs:
         run: |
           if [[ "${{ steps.route.outputs.has_arduino }}" == "true" ]]; then
             {
-              echo "### Arduino sketches selected"
+              echo "### Arduino Rev1.x sketches selected"
               echo
               printf '%s\n' "$SELECTED_SKETCHES" | tr ',' '\n' | sed '/^$/d' | sed 's/^/- /'
               echo
-              echo "Each sketch is compiled for the 3.4C and 4C displays."
+              echo "Each sketch is compiled for the 3.4C and 4C displays with ChipVariant=prev3."
             } >> "$GITHUB_STEP_SUMMARY"
           else
             echo "No Arduino sketch build was selected." >> "$GITHUB_STEP_SUMMARY"
           fi
-          if [[ "${{ steps.route.outputs.firmware_touched }}" == "true" ]]; then
-            echo "Maintained firmware changed; it remains outside the example matrix." >> "$GITHUB_STEP_SUMMARY"
-          fi
-          if [[ "${{ steps.route.outputs.release_review }}" == "true" ]]; then
-            echo "Binary or archive changes require explicit release review." >> "$GITHUB_STEP_SUMMARY"
-          fi
 
   build:
-    name: Build ${{ matrix.sketch_name }} / ${{ matrix.profile_id }} (${{ matrix.screen }})
+    name: Build ${{ matrix.sketch_name }} / Rev1.3 (${{ matrix.screen }})
     needs: discover
     if: needs.discover.outputs.has_sketches == 'true'
     runs-on: ubuntu-latest
@@ -120,6 +111,14 @@ jobs:
           arduino-cli core install "esp32:esp32@$ARDUINO_CORE_VERSION" \
             --additional-urls "$ESP32_INDEX_URL"
 
+      - name: Verify ESP32-P4 Rev1.x profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$ARDUINO_FQBN" == *"ChipVariant=prev3"* ]]
+          [[ "$ARDUINO_FQBN" != *"ChipVariant=postv3"* ]]
+          echo "Verified Rev1.x FQBN: $ARDUINO_FQBN"
+
       - name: Compile sketch
         shell: bash
         env:
@@ -131,7 +130,6 @@ jobs:
           set -euo pipefail
           library_root="$GITHUB_WORKSPACE/examples/arduino/libraries"
           build_path="$RUNNER_TEMP/arduino-build/$SKETCH_NAME/$SCREEN_NAME"
-
           arduino-cli compile \
             --fqbn "$ARDUINO_FQBN" \
             --warnings all \
@@ -139,12 +137,14 @@ jobs:
             --build-path "$build_path" \
             --build-property "compiler.cpp.extra_flags=-DCURRENT_SCREEN=$SCREEN_DEFINE" \
             "$SKETCH_PATH"
+          test -f "$build_path/flash_args"
+          test -f "$build_path/build.options.json"
 
-      - name: Package flashable example artifact
+      - name: Package flashable Rev1.x artifact
         id: package
         shell: bash
         env:
-          ARTIFACT_KEY: ${{ matrix.artifact_key }}
+          ARTIFACT_KEY: ${{ matrix.artifact_key }}-rev1_3
         run: |
           set -euo pipefail
           git_sha="$(git rev-parse HEAD)"
@@ -152,6 +152,7 @@ jobs:
           output="$RUNNER_TEMP/example-artifacts/$ARTIFACT_KEY"
           zip_output="$RUNNER_TEMP/example-artifacts/${ARTIFACT_KEY}.zip"
           test "$BSP_REFERENCE_RELATIONSHIP" = "reference-only"
+
           python .github/scripts/package_build_artifact.py arduino \
             --build-dir "$build_path" --output-dir "$output" \
             --zip-output "$zip_output" \
@@ -160,13 +161,14 @@ jobs:
             --resolution "${{ matrix.resolution }}" --configuration "${{ matrix.configuration }}" \
             --framework-version "$ARDUINO_CORE_VERSION" --target esp32p4 \
             --project "${{ matrix.sketch }}" --sketch "${{ matrix.sketch_name }}" \
-            --fqbn "$ARDUINO_FQBN" --profile-id "${{ matrix.profile_id }}" \
+            --fqbn "$ARDUINO_FQBN" --profile-id "rev1_3" \
             --build-options "$build_path/build.options.json" \
             --source-root "$GITHUB_WORKSPACE" --git-sha "$git_sha" \
             --bsp-sha "$BSP_REFERENCE_SOURCE_SHA" \
             --bsp-source-tree "$BSP_REFERENCE_SOURCE_TREE" \
             --bsp-component-tree "$BSP_REFERENCE_COMPONENT_TREE" \
             --bsp-version "$BSP_REFERENCE_VERSION"
+
           validation_args=(
             --target esp32p4 --product-sha "$git_sha"
             --fqbn "$ARDUINO_FQBN" --framework-version "$ARDUINO_CORE_VERSION"
@@ -183,7 +185,7 @@ jobs:
           echo "name=${ARTIFACT_KEY}-${git_sha:0:12}" >> "$GITHUB_OUTPUT"
           echo "path=$zip_output" >> "$GITHUB_OUTPUT"
 
-      - name: Upload flashable example artifact
+      - name: Upload flashable Rev1.x artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.package.outputs.name }}
